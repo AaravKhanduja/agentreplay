@@ -171,7 +171,7 @@ The 3B default is deliberate: it runs on a laptop without a GPU. Nothing is down
 
 ## Development
 
-Requires Node ≥ 20 and pnpm ≥ 9.
+Requires Node ≥ 20 and pnpm ≥ 10 (the repo pins `pnpm@10.33.0` via `packageManager`).
 
 ```sh
 pnpm install && pnpm build && pnpm test

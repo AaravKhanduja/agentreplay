@@ -4,7 +4,7 @@ Thanks for looking under the hood. This project is maintained best-effort; focus
 
 ## Dev setup
 
-Requires Node ≥ 20 and pnpm ≥ 9.
+Requires Node ≥ 20 and pnpm ≥ 10 (the repo pins `pnpm@10.33.0` via `packageManager`).
 
 ```sh
 pnpm install
