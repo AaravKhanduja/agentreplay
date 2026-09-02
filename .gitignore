@@ -1,0 +1,19 @@
+# dependencies
+node_modules/
+
+# build output
+dist/
+out/
+.next/
+*.tsbuildinfo
+
+# the viewer single-file build artifact lives in the cli package but is built, not committed
+packages/cli/assets/viewer.html
+packages/cli/assets/demo-session.jsonl
+# copied from the repo root at build time so the npm tarball carries them
+packages/cli/README.md
+packages/cli/LICENSE
+
+# misc
+.DS_Store
+*.log

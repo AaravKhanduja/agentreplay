@@ -1,0 +1,21 @@
+{
+  "name": "agentreplay-monorepo",
+  "private": true,
+  "type": "module",
+  "engines": {
+    "node": ">=20"
+  },
+  "packageManager": "pnpm@10.33.0",
+  "scripts": {
+    "build": "pnpm --filter @agentreplay/core build && pnpm --filter @agentreplay/viewer build && pnpm --filter agentreplay build",
+    "test": "pnpm -r test",
+    "typecheck": "pnpm -r typecheck",
+    "dev:viewer": "pnpm --filter @agentreplay/viewer dev",
+    "cli": "pnpm --filter agentreplay dev"
+  },
+  "devDependencies": {
+    "puppeteer-core": "^25.3.0"
+  },
+  "description": "AgentReplay monorepo \u2014 a local CLI that turns Claude Code sessions into visual replays.",
+  "license": "MIT"
+}
