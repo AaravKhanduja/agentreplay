@@ -43,7 +43,7 @@ jobs:
     environment: npm-publish
     permissions:
       contents: read
-      id-token: write # required for npm provenance
+      id-token: write # required for OIDC trusted publishing and provenance
 
     steps:
       - uses: actions/checkout@v4
@@ -57,11 +57,20 @@ jobs:
       - run: pnpm install --frozen-lockfile
       - run: pnpm build
 
+      # OIDC token exchange landed in npm 11.5.1 and Node 22 still ships 10.x,
+      # so the runner's bundled npm cannot authenticate as a trusted publisher.
+      - name: Upgrade npm for trusted publishing
+        run: npm install -g npm@latest
+
+      # There is no NPM_TOKEN. npm authenticates as a trusted publisher: the
+      # runner exchanges its OIDC identity for a short-lived credential, which
+      # npm accepts only from this repository, workflow and environment (set at
+      # npmjs.com → agentreplay-cli → Settings → Trusted Publisher). Nothing
+      # long-lived is stored, and there is no secret to leak or rotate.
+      #
       # --provenance publishes a signed attestation linking this tarball to this
       # repository and commit, which npm shows on the package page. It needs the
       # id-token permission above.
       - name: Publish to npm
         working-directory: packages/cli
         run: npm publish --provenance
-        env:
-          NODE_AUTH_TOKEN: ${{ secrets.NPM_TOKEN }}
