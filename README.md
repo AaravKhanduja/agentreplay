@@ -10,18 +10,30 @@ The output is one self-contained HTML file with one hierarchy: a **header** that
 
 ## Quickstart
 
+Run it without installing:
+
 ```sh
 npx agentreplay-cli          # pick from your 20 most recent Claude Code sessions
 npx agentreplay-cli --demo   # bundled demo session — works without Claude Code
 ```
 
-Installed globally (`npm i -g agentreplay-cli`) the command is just `agentreplay`.
+Or install once, and the command is shorter:
+
+```sh
+npm i -g agentreplay-cli
+agentreplay --demo
+```
+
+> The npm package is **`agentreplay-cli`**; the command it installs is **`agentreplay`**.
+> The suffix exists only because npm blocks `agentreplay` as too similar to an
+> unrelated `agent-replay` package.
 
 AgentReplay reads a session file from `~/.claude/projects/`, analyzes it, and opens a single self-contained HTML file in your browser. No server, no install step beyond the CLI itself.
 
-All flags:
+All flags, written as the installed command — with `npx`, prefix them
+(`npx agentreplay-cli --last`):
 
-| Flag | What it does |
+| Command | What it does |
 |---|---|
 | `agentreplay` | Picker over the 20 most recent sessions across all projects |
 | `agentreplay --last` | Skip the picker, open the most recent session |
