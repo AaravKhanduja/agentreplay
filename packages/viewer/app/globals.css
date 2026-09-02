@@ -1,0 +1,956 @@
+/* ==========================================================================
+   AgentReplay design tokens (§7 of the plan — these are constraints)
+   Color encodes tool CATEGORY (blue read / amber write / purple bash).
+   Green/red are OUTCOMES only. --selection cyan is selection/revisit only.
+   Radius ≤ 6px. Panels mark exceptional or actionable objects only —
+   ordinary session structure sits on the page background. No gradients.
+   Animations ≤ 200ms.
+   ========================================================================== */
+
+:root {
+  --bg-app: #0f1115;
+  --bg-panel: #151922;
+  --bg-elevated: #1b2130;
+  --bg-tint-blue: #1e2a4a;
+  --bg-tint-amber: #3d2e13;
+  --bg-tint-green: #0f2e26;
+  --bg-tint-red: #3d1a1a;
+  --bg-tint-purple: #2a1f3d;
+  --text-primary: #f3f4f6;
+  --text-secondary: #b6bdc9;
+  --text-muted: #7c8596;
+  --text-dim: #4a5263;
+  --border-subtle: #232838;
+  --border-default: #2d3343;
+  --border-strong: #3d4458;
+  --read-fill: #3b82f6;
+  --read-border: #60a5fa; /* tool category: reads */
+  --edit-fill: #f59e0b;
+  --edit-border: #fbbf24; /* tool category: writes */
+  --bash-fill: #a78bfa;
+  --bash-border: #c4b5fd; /* tool category: bash */
+  --success: #10b981;
+  --success-border: #34d399; /* OUTCOME only */
+  --error: #ef4444;
+  --error-border: #f87171; /* OUTCOME only */
+  --warn: #fbbf24;
+  --selection: #22d3ee; /* selection/focus/revisit ONLY */
+}
+
+/* Derived component tokens (not semantic colors — mappings of the above). */
+:root {
+  --font-sans: 'IBM Plex Sans', -apple-system, 'Segoe UI', sans-serif;
+  --font-mono: 'IBM Plex Mono', ui-monospace, 'SF Mono', Menlo, monospace;
+  --phase-explore: var(--read-fill);
+  --phase-plan: var(--text-muted);
+  --phase-execute: var(--edit-fill);
+  --phase-debug: var(--error);
+  --phase-verify: var(--success);
+  /* The left gutter every section line hangs off: attribution, labels, body. */
+  --gutter: 52px;
+}
+
+/* ==========================================================================
+   Base
+   ========================================================================== */
+
+* {
+  box-sizing: border-box;
+}
+
+html,
+body {
+  margin: 0;
+  padding: 0;
+}
+
+body {
+  background: var(--bg-app);
+  color: var(--text-primary);
+  font-family: var(--font-sans);
+  font-size: 14px;
+  line-height: 1.5;
+  -webkit-font-smoothing: antialiased;
+}
+
+.mono {
+  font-family: var(--font-mono);
+}
+
+button {
+  font: inherit;
+  color: inherit;
+  background: none;
+  border: none;
+  padding: 0;
+  text-align: left;
+  cursor: pointer;
+}
+
+:focus-visible {
+  outline: 1px solid var(--selection);
+  outline-offset: 2px;
+  border-radius: 3px;
+}
+
+h1,
+h2,
+h3,
+h4,
+h5,
+p,
+ul,
+ol,
+dl,
+dd,
+dt,
+pre {
+  margin: 0;
+  padding: 0;
+}
+
+ul,
+ol {
+  list-style: none;
+}
+
+::-webkit-scrollbar {
+  width: 10px;
+  height: 10px;
+}
+::-webkit-scrollbar-track {
+  background: transparent;
+}
+::-webkit-scrollbar-thumb {
+  background: var(--border-default);
+  border-radius: 5px;
+  border: 2px solid var(--bg-app);
+}
+::-webkit-scrollbar-thumb:hover {
+  background: var(--border-strong);
+}
+
+
+/* ==========================================================================
+   Topbar (sticky)
+   ========================================================================== */
+
+.ar-topbar {
+  position: sticky;
+  top: 0;
+  z-index: 10;
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  height: 44px;
+  padding: 0 16px;
+  background: var(--bg-panel);
+  border-bottom: 1px solid var(--border-subtle);
+  white-space: nowrap;
+  overflow: hidden;
+}
+
+.ar-wordmark {
+  font-size: 13px;
+  font-weight: 600;
+  letter-spacing: 0.01em;
+}
+
+.ar-topbar-path {
+  font-size: 12px;
+  color: var(--text-secondary);
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.ar-topbar-spacer {
+  flex: 1;
+}
+
+.ar-topbar-meta {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  font-size: 11px;
+  color: var(--text-muted);
+}
+
+.ar-sep {
+  color: var(--text-dim);
+}
+
+.ar-enrich-badge {
+  margin-left: 6px;
+  padding: 1px 6px;
+  font-size: 11px;
+  border: 1px solid var(--border-strong);
+  border-radius: 4px;
+  color: var(--text-secondary);
+  background: var(--bg-elevated);
+}
+
+/* ==========================================================================
+   Narrative rich text (styles map 1:1 to NarrativeStyle)
+   ========================================================================== */
+
+.ar-rt--file {
+  font-family: var(--font-mono);
+  font-size: 0.94em;
+  color: var(--text-primary);
+}
+.ar-rt--bad {
+  color: var(--error-border);
+}
+.ar-rt--good {
+  color: var(--success-border);
+}
+.ar-rt--hl {
+  color: var(--text-primary);
+  font-weight: 500;
+}
+
+/* ==========================================================================
+   Layout: header, then a spine + the session beside it
+   ========================================================================== */
+
+.ar-main,
+.ar-thin {
+  max-width: 940px;
+  margin: 0 auto;
+  padding: 32px 24px 48px;
+}
+
+.ar-footer {
+  margin-top: 40px;
+  padding-top: 14px;
+  border-top: 1px solid var(--border-subtle);
+  font-size: 11px;
+  color: var(--text-dim);
+}
+
+.ar-thin-note {
+  margin-top: 14px;
+  font-size: 12px;
+  color: var(--text-muted);
+}
+
+/* ==========================================================================
+   Header — title, stats, phase bars, one finding
+   ========================================================================== */
+
+/* Full container width and a size that keeps a ~65-char title on one line —
+   26ch was folding ordinary titles into three. `balance` evens the rare
+   two-liner instead of leaving one orphaned word. */
+.ar-title {
+  font-size: 26px;
+  font-weight: 600;
+  letter-spacing: -0.02em;
+  line-height: 1.25;
+  text-wrap: balance;
+}
+
+.ar-stats {
+  margin-top: 10px;
+  font-size: 12.5px;
+  color: var(--text-muted);
+}
+
+.ar-opening {
+  margin-top: 16px;
+  max-width: 68ch;
+  font-size: 15px;
+  font-style: italic;
+  line-height: 1.6;
+  color: var(--text-secondary);
+}
+
+.ar-headline {
+  margin-top: 22px;
+  max-width: 60ch;
+  font-size: 17px;
+  line-height: 1.45;
+  letter-spacing: -0.005em;
+  color: var(--text-secondary);
+}
+
+
+/* ==========================================================================
+   Ribbon — the shape of the session on a working-time axis
+   ========================================================================== */
+
+.ar-ribbon {
+  margin: 24px 0 0;
+}
+
+.ar-ribbon-svg {
+  display: block;
+  width: 100%;
+  height: 32px;
+}
+
+.ar-ribbon-phase {
+  cursor: pointer;
+  opacity: 0.82;
+}
+
+.ar-ribbon-phase:hover {
+  opacity: 1;
+}
+
+.ar-ribbon-phase--explore {
+  fill: var(--phase-explore);
+}
+.ar-ribbon-phase--plan {
+  fill: var(--phase-plan);
+}
+.ar-ribbon-phase--execute {
+  fill: var(--phase-execute);
+}
+.ar-ribbon-phase--debug {
+  fill: var(--phase-debug);
+}
+.ar-ribbon-phase--verify {
+  fill: var(--phase-verify);
+}
+
+.ar-ribbon-gap {
+  pointer-events: none;
+}
+
+/* The key: names laid along the axis they explain, not a box beside it. The
+   swatch carries the colour and the name stays readable — a phase name set in
+   its own phase colour makes `plan` grey text on a dark ground. */
+.ar-ribbon-key {
+  position: relative;
+  height: 17px;
+  margin-top: 5px;
+}
+
+.ar-ribbon-key-item {
+  position: absolute;
+  top: 0;
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  padding: 0;
+  font-family: var(--font-mono);
+  font-size: 10px;
+  letter-spacing: 0.07em;
+  text-transform: uppercase;
+  white-space: nowrap;
+  color: var(--text-muted);
+  transition: color 140ms ease;
+}
+
+.ar-ribbon-key-item:hover {
+  color: var(--text-primary);
+}
+
+/* The trailing group flows normally inside its own right-aligned strip. */
+.ar-ribbon-key-rest {
+  position: absolute;
+  top: 0;
+  right: 0;
+  display: flex;
+  gap: 10px;
+}
+
+.ar-ribbon-key-item.is-static {
+  position: static;
+}
+
+.ar-ribbon-swatch {
+  display: block;
+  width: 7px;
+  height: 7px;
+  border-radius: 2px;
+}
+
+.ar-ribbon-swatch--explore {
+  background: var(--phase-explore);
+}
+.ar-ribbon-swatch--plan {
+  background: var(--phase-plan);
+}
+.ar-ribbon-swatch--execute {
+  background: var(--phase-execute);
+}
+.ar-ribbon-swatch--debug {
+  background: var(--phase-debug);
+}
+.ar-ribbon-swatch--verify {
+  background: var(--phase-verify);
+}
+
+.ar-ribbon-axis {
+  display: flex;
+  justify-content: space-between;
+  gap: 12px;
+  margin-top: 4px;
+  font-size: 10px;
+  color: var(--text-dim);
+}
+
+.ar-ribbon-note {
+  color: var(--text-muted);
+}
+
+/* ==========================================================================
+   Event graph — one column, the story of the session. This is the replay.
+   Ribbon = map · graph = story · drawer = proof. Everything here draws
+   core's own labels; the viewer authors nothing.
+   ========================================================================== */
+
+.ar-graph {
+  position: relative;
+  max-width: 620px;
+  margin-top: 16px;
+  /* time | connector | content — one compositional unit, not three columns */
+  --graph-gutter: 42px;
+  --graph-line: calc(var(--graph-gutter) + 14px);
+  --graph-indent: calc(var(--graph-line) + 18px);
+}
+
+/* ---- chapters ---- */
+
+.ar-graph-phase {
+  position: relative;
+  padding-top: 46px;
+}
+
+.ar-graph-phase:first-child {
+  padding-top: 18px;
+}
+
+/* The connector breaks between chapters: one line per phase, not one line
+   through the whole session. */
+.ar-graph-phase::before {
+  content: '';
+  position: absolute;
+  left: var(--graph-line);
+  top: 44px;
+  bottom: 10px;
+  width: 1px;
+  background: var(--border-default);
+}
+
+.ar-graph-phase:first-child::before {
+  top: 16px;
+}
+
+/* A chapter marker, not navigation: small, mono, muted, a tiny colour mark. */
+.ar-graph-phase-head {
+  display: flex;
+  align-items: center;
+  gap: 7px;
+  margin-left: var(--graph-indent);
+  margin-bottom: 4px;
+  font-size: 10px;
+  letter-spacing: 0.11em;
+  text-transform: uppercase;
+  color: var(--text-dim);
+  transition: color 140ms ease;
+}
+
+.ar-graph-phase-mark {
+  width: 6px;
+  height: 6px;
+  border-radius: 2px;
+}
+
+.ar-graph-phase-mark--explore {
+  background: var(--phase-explore);
+}
+.ar-graph-phase-mark--plan {
+  background: var(--phase-plan);
+}
+.ar-graph-phase-mark--execute {
+  background: var(--phase-execute);
+}
+.ar-graph-phase-mark--debug {
+  background: var(--phase-debug);
+}
+.ar-graph-phase-mark--verify {
+  background: var(--phase-verify);
+}
+
+.ar-graph-phase-time {
+  color: var(--text-dim);
+  letter-spacing: 0.04em;
+}
+
+/* Ribbon hover lights its chapter, so the map and the story read as one. */
+.ar-graph-phase.is-lit .ar-graph-phase-kind {
+  color: var(--text-secondary);
+}
+
+.ar-graph-phase.is-lit::before {
+  background: var(--border-default);
+}
+
+/* ---- nodes: three visual weights, rhythm scales with importance ---- */
+
+.ar-graph-node {
+  position: relative;
+  padding: 12px 0 12px var(--graph-indent);
+}
+
+.ar-graph-node--key {
+  padding-top: 26px;
+  padding-bottom: 26px;
+}
+
+.ar-graph-node--k-rootCause {
+  padding-top: 32px;
+  padding-bottom: 32px;
+}
+
+.ar-graph-node--outcome {
+  padding-top: 32px;
+  padding-bottom: 22px;
+}
+
+.ar-graph-time {
+  position: absolute;
+  left: 0;
+  top: 14px;
+  width: var(--graph-gutter);
+  text-align: right;
+  font-size: 10.5px;
+  color: var(--text-dim);
+}
+
+.ar-graph-node--key .ar-graph-time {
+  top: 28px;
+}
+
+.ar-graph-node--k-rootCause .ar-graph-time {
+  top: 34px;
+}
+
+.ar-graph-node--outcome .ar-graph-time {
+  top: 34px;
+}
+
+/* The mark sits on the connector, on a disc of page background. */
+.ar-graph-mark {
+  position: absolute;
+  left: var(--graph-line);
+  top: 13px;
+  transform: translateX(-50%);
+  width: 16px;
+  height: 16px;
+  display: grid;
+  place-items: center;
+  background: var(--bg-app);
+  border-radius: 50%;
+  font-size: 9.5px;
+  line-height: 1;
+  color: var(--text-secondary);
+  transition: color 140ms ease;
+}
+
+.ar-graph-node--key .ar-graph-mark {
+  top: 27px;
+  font-size: 14px;
+}
+
+.ar-graph-node--k-rootCause .ar-graph-mark {
+  top: 33px;
+  font-size: 15.5px;
+}
+
+.ar-graph-node--outcome .ar-graph-mark {
+  top: 33px;
+  font-size: 14px;
+}
+
+.ar-graph-node--k-discovery .ar-graph-mark,
+.ar-graph-node--k-hypothesis .ar-graph-mark {
+  color: var(--read-border);
+}
+.ar-graph-node--k-rootCause .ar-graph-mark {
+  color: var(--text-primary);
+}
+.ar-graph-node--k-decision .ar-graph-mark {
+  color: var(--text-secondary);
+}
+.ar-graph-node--k-pivot .ar-graph-mark {
+  color: var(--bash-border);
+}
+.ar-graph-node--k-failure .ar-graph-mark {
+  color: var(--error-border);
+}
+.ar-graph-node--k-blocker .ar-graph-mark {
+  color: var(--warn);
+}
+.ar-graph-node--k-verification .ar-graph-mark {
+  color: var(--success-border);
+}
+
+/* The whole body selects the event; the drawer opens beside, never inline. */
+.ar-graph-body {
+  cursor: pointer;
+}
+
+/* ---- chip: the semantic verb, so the content stays session-authored ---- */
+
+.ar-graph-chip {
+  display: inline-block;
+  margin-bottom: 6px;
+  font-size: 10px;
+  font-weight: 500;
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+  color: var(--text-dim);
+}
+
+.ar-graph-node--k-rootCause .ar-graph-chip {
+  color: var(--text-primary);
+}
+.ar-graph-node--k-discovery .ar-graph-chip,
+.ar-graph-node--k-hypothesis .ar-graph-chip {
+  color: var(--read-border);
+}
+.ar-graph-node--k-pivot .ar-graph-chip {
+  color: var(--bash-border);
+}
+.ar-graph-node--k-decision .ar-graph-chip {
+  color: var(--text-secondary);
+}
+.ar-graph-node--k-failure .ar-graph-chip {
+  color: var(--error-border);
+}
+.ar-graph-node--k-blocker .ar-graph-chip {
+  color: var(--warn);
+}
+.ar-graph-node--k-verification .ar-graph-chip {
+  color: var(--success-border);
+}
+
+/* ---- content: session wording, no quotation marks, no speaker label ---- */
+
+.ar-graph-text {
+  max-width: 52ch;
+  font-size: 14px;
+  line-height: 1.5;
+  color: var(--text-secondary);
+  transition: color 140ms ease;
+}
+
+.ar-graph-node--key .ar-graph-text {
+  max-width: 46ch;
+  font-size: 16.5px;
+  line-height: 1.45;
+  letter-spacing: -0.005em;
+  color: var(--text-primary);
+}
+
+.ar-graph-node--k-rootCause .ar-graph-text {
+  font-size: 17.5px;
+}
+
+.ar-graph-node--outcome .ar-graph-text {
+  max-width: 46ch;
+  font-size: 16px;
+  color: var(--text-primary);
+}
+
+/* The opening request: quiet, italic, clamped — the header already quotes it. */
+.ar-graph-node--k-question .ar-graph-text {
+  display: -webkit-box;
+  -webkit-line-clamp: 2;
+  -webkit-box-orient: vertical;
+  overflow: hidden;
+  font-style: italic;
+}
+
+.ar-graph-support {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: baseline;
+  gap: 9px;
+  max-width: 52ch;
+  margin-top: 7px;
+  font-size: 11px;
+  color: var(--text-dim);
+}
+
+.ar-graph-support-item + .ar-graph-support-item::before {
+  content: '· ';
+  color: var(--border-strong);
+}
+
+.ar-graph-seen {
+  font-size: 11px;
+  color: var(--selection);
+  opacity: 0.85;
+}
+
+button.ar-graph-seen:hover {
+  opacity: 1;
+  border-bottom: 1px solid var(--selection);
+}
+
+/* The affordance, not a control: quiet mono that brightens on hover. The
+   event outranks its own button — chrome here made the page a dashboard. */
+.ar-graph-evd {
+  font-size: 10.5px;
+  letter-spacing: 0.05em;
+  color: var(--text-dim);
+  transition: color 140ms ease;
+}
+
+/* `· Evidence →` reads as the last item of the footer it belongs to. */
+.ar-graph-support > * + .ar-graph-evd::before {
+  content: '· ';
+  color: var(--border-strong);
+}
+
+.ar-graph-node:hover .ar-graph-evd,
+.ar-graph-evd:focus-visible {
+  color: var(--text-muted);
+}
+
+.ar-graph-evd:hover {
+  color: var(--selection);
+}
+
+/* ---- selected: subtly brighter, never a card, never dims the rest ---- */
+
+.ar-graph-node.is-selected .ar-graph-text {
+  color: var(--text-primary);
+}
+
+.ar-graph-node.is-selected .ar-graph-mark {
+  color: var(--text-primary);
+}
+
+.ar-graph-node.is-selected .ar-graph-evd {
+  color: var(--selection);
+}
+
+/* ==========================================================================
+   Evidence drawer — proof beside the story, never inside it
+   ========================================================================== */
+
+.ar-drawer {
+  position: fixed;
+  top: 0;
+  right: 0;
+  bottom: 0;
+  z-index: 80;
+  width: clamp(360px, 30vw, 460px);
+  padding: 16px 22px 48px;
+  background: var(--bg-panel);
+  border-left: 1px solid var(--border-default);
+  overflow-y: auto;
+  animation: ar-drawer-in 160ms ease;
+}
+
+@keyframes ar-drawer-in {
+  from {
+    transform: translateX(24px);
+    opacity: 0;
+  }
+  to {
+    transform: none;
+    opacity: 1;
+  }
+}
+
+.ar-drawer-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+}
+
+.ar-drawer-kind {
+  font-size: 11px;
+  font-weight: 500;
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+  color: var(--text-secondary);
+}
+
+.ar-drawer-kind--rootCause {
+  color: var(--text-primary);
+}
+.ar-drawer-kind--discovery,
+.ar-drawer-kind--hypothesis {
+  color: var(--read-border);
+}
+.ar-drawer-kind--pivot {
+  color: var(--bash-border);
+}
+.ar-drawer-kind--failure {
+  color: var(--error-border);
+}
+.ar-drawer-kind--blocker {
+  color: var(--warn);
+}
+.ar-drawer-kind--verification {
+  color: var(--success-border);
+}
+
+.ar-drawer-close {
+  padding: 2px 6px;
+  font-size: 11px;
+  color: var(--text-dim);
+  border-radius: 4px;
+}
+
+.ar-drawer-close:hover {
+  color: var(--text-primary);
+  background: var(--bg-elevated);
+}
+
+.ar-drawer-prov {
+  margin-top: 4px;
+  font-size: 11px;
+  color: var(--text-dim);
+}
+
+.ar-drawer-section {
+  margin-top: 20px;
+}
+
+.ar-drawer-label {
+  margin-bottom: 8px;
+  padding-bottom: 5px;
+  border-bottom: 1px solid var(--border-subtle);
+  font-size: 10px;
+  font-weight: 500;
+  letter-spacing: 0.1em;
+  text-transform: uppercase;
+  color: var(--text-dim);
+}
+
+/* The one surface where quoting is the point: exact transcript treatment. */
+.ar-drawer-quote {
+  font-size: 13.5px;
+  font-style: italic;
+  line-height: 1.55;
+  color: var(--text-primary);
+}
+
+.ar-drawer-fact {
+  font-size: 13.5px;
+  line-height: 1.55;
+  color: var(--text-primary);
+}
+
+.ar-drawer-files {
+  font-size: 12px;
+  line-height: 1.8;
+  color: var(--text-muted);
+}
+
+.ar-drawer-files span {
+  display: block;
+}
+
+.ar-drawer-turn-toggle {
+  padding-bottom: 2px;
+  font-size: 11px;
+  color: var(--text-muted);
+  border-bottom: 1px solid var(--border-default);
+  transition: color 140ms ease, border-color 140ms ease;
+}
+
+.ar-drawer-turn-toggle:hover {
+  color: var(--text-primary);
+  border-color: var(--border-strong);
+}
+
+.ar-drawer-label--calls {
+  margin-top: 16px;
+}
+
+.ar-drawer-turn {
+  margin-top: 14px;
+  font-size: 13px;
+  color: var(--text-secondary);
+}
+
+.ar-drawer-turn + .ar-drawer-label {
+  margin-top: 18px;
+}
+
+.ar-drawer-calls {
+  margin: 0;
+  padding: 0;
+  list-style: none;
+  font-size: 11px;
+  line-height: 1.8;
+  color: var(--text-muted);
+}
+
+/* ==========================================================================
+   Markdown — transcript turns in the evidence layer
+   ========================================================================== */
+
+.ar-md-para {
+  margin: 0 0 8px;
+  white-space: pre-wrap;
+  line-height: 1.55;
+}
+
+.ar-md-heading {
+  margin: 12px 0 6px;
+  font-size: 13px;
+  font-weight: 600;
+  color: var(--text-primary);
+}
+
+.ar-md-list {
+  margin: 0 0 8px;
+  padding-left: 18px;
+  list-style: none;
+}
+
+.ar-md-list li {
+  position: relative;
+  margin-bottom: 3px;
+  line-height: 1.55;
+}
+
+.ar-md-list li::before {
+  content: '–';
+  position: absolute;
+  left: -14px;
+  color: var(--text-dim);
+}
+
+.ar-md-quote {
+  margin: 0 0 8px;
+  padding-left: 10px;
+  border-left: 2px solid var(--border-default);
+  color: var(--text-muted);
+  white-space: pre-wrap;
+}
+
+.ar-md-code {
+  margin: 0 0 10px;
+  padding: 8px 10px;
+  font-size: 11.5px;
+  line-height: 1.6;
+  background: var(--bg-elevated);
+  border: 1px solid var(--border-subtle);
+  border-radius: 4px;
+  overflow-x: auto;
+  white-space: pre;
+}
+
+.ar-md-inline {
+  padding: 0 3px;
+  font-size: 0.92em;
+  background: var(--bg-elevated);
+  border-radius: 3px;
+  color: var(--text-primary);
+}
+
+.ar-md > :last-child {
+  margin-bottom: 0;
+}

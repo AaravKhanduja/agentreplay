@@ -1,0 +1,26 @@
+{
+  "name": "@agentreplay/viewer",
+  "version": "0.1.0",
+  "description": "Single-file offline viewer for AgentReplay sessions",
+  "license": "MIT",
+  "private": true,
+  "scripts": {
+    "dev": "next dev",
+    "build": "next build && node scripts/inline.mjs",
+    "typecheck": "tsc --noEmit"
+  },
+  "dependencies": {
+    "@agentreplay/core": "workspace:*",
+    "@fontsource/ibm-plex-mono": "^5.0.13",
+    "@fontsource/ibm-plex-sans": "^5.0.20",
+    "next": "^14.2.15",
+    "react": "^18.3.1",
+    "react-dom": "^18.3.1"
+  },
+  "devDependencies": {
+    "@types/node": "^20.14.0",
+    "@types/react": "^18.3.5",
+    "@types/react-dom": "^18.3.0",
+    "typescript": "^5.5.4"
+  }
+}
