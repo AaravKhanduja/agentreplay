@@ -74,3 +74,32 @@ jobs:
       - name: Publish to npm
         working-directory: packages/cli
         run: npm publish --provenance
+
+  # A tag push should never again publish to npm and silently skip the GitHub
+  # release. This drafts one rather than publishing it: the notes on 0.1.0-0.1.2
+  # were written by hand and read better than any generated commit list, so the
+  # job guarantees the release object exists with a starting point, and a human
+  # edits and publishes it. Skipped on workflow_dispatch, which has no tag.
+  github-release:
+    needs: publish
+    if: github.event_name == 'push'
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write # creating a release writes to the repository
+
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0 # --generate-notes needs history to diff against
+
+      # Idempotent: a re-run of a release that already has one must not fail.
+      - name: Draft the GitHub release
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          gh release view "$GITHUB_REF_NAME" >/dev/null 2>&1 && exit 0
+          gh release create "$GITHUB_REF_NAME" \
+            --draft \
+            --verify-tag \
+            --title "$GITHUB_REF_NAME" \
+            --generate-notes
