@@ -9,7 +9,7 @@
   "scripts": {
     "build": "pnpm --filter @agentreplay/core build && pnpm --filter @agentreplay/viewer build && pnpm --filter agentreplay build",
     "test": "pnpm -r test",
-    "typecheck": "pnpm -r typecheck",
+    "typecheck": "pnpm --filter @agentreplay/core build && pnpm -r typecheck",
     "dev:viewer": "pnpm --filter @agentreplay/viewer dev",
     "cli": "pnpm --filter agentreplay dev"
   },
