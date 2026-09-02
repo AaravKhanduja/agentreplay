@@ -1,0 +1,46 @@
+{
+  "name": "@agentreplay/core",
+  "version": "0.1.0",
+  "private": true,
+  "description": "Parser and deterministic heuristics behind AgentReplay: Claude Code session JSONL in, an analyzed session out.",
+  "keywords": [
+    "claude-code",
+    "session",
+    "jsonl",
+    "parser",
+    "analysis",
+    "agentreplay"
+  ],
+  "license": "MIT",
+  "author": "Aarav Khanduja",
+  "type": "module",
+  "main": "./dist/index.js",
+  "types": "./dist/index.d.ts",
+  "files": [
+    "dist"
+  ],
+  "engines": {
+    "node": ">=20"
+  },
+  "scripts": {
+    "build": "tsc -p tsconfig.json",
+    "test": "vitest run",
+    "test:watch": "vitest",
+    "typecheck": "tsc -p tsconfig.json --noEmit"
+  },
+  "dependencies": {
+    "diff": "^5.2.0"
+  },
+  "devDependencies": {
+    "@types/diff": "^5.2.1",
+    "@types/node": "^20.14.0",
+    "typescript": "^5.5.4",
+    "vitest": "^2.1.0"
+  },
+  "exports": {
+    ".": {
+      "types": "./dist/index.d.ts",
+      "default": "./dist/index.js"
+    }
+  }
+}
