@@ -1,5 +1,5 @@
 {
-  "name": "agentreplay",
+  "name": "agentreplay-cli",
   "version": "0.1.0",
   "description": "Turn a Claude Code session into a self-contained HTML replay of how the agent worked \u2014 locally, with no telemetry.",
   "keywords": [

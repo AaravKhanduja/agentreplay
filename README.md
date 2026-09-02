@@ -7,9 +7,11 @@ The output is one self-contained HTML file with one hierarchy: a **header** that
 ## Quickstart
 
 ```sh
-npx agentreplay          # pick from your 20 most recent Claude Code sessions
-npx agentreplay --demo   # bundled demo session — works without Claude Code
+npx agentreplay-cli          # pick from your 20 most recent Claude Code sessions
+npx agentreplay-cli --demo   # bundled demo session — works without Claude Code
 ```
+
+Installed globally (`npm i -g agentreplay-cli`) the command is just `agentreplay`.
 
 > Not yet published to npm. Until the first npm release, run from source:
 >
