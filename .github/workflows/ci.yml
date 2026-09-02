@@ -13,7 +13,7 @@ jobs:
         node: [20, 22]
 
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v7
 
       # No `version:` here on purpose — package.json's `packageManager` field
       # is the single source of truth, and the action errors if both are set.
