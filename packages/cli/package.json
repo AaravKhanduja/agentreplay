@@ -46,7 +46,7 @@
     "prepublishOnly": "cd ../.. && pnpm build"
   },
   "dependencies": {
-    "@inquirer/prompts": "^5.3.8",
+    "@inquirer/prompts": "^8.7.1",
     "commander": "^12.1.0"
   },
   "devDependencies": {
