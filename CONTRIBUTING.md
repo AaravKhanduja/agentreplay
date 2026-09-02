@@ -2,6 +2,11 @@
 
 Thanks for looking under the hood. This project is maintained best-effort; focused PRs with tests are the most likely to land quickly.
 
+The published package is [`agentreplay-cli`](https://www.npmjs.com/package/agentreplay-cli)
+(`npx agentreplay-cli --demo`); the installed command is `agentreplay`. The npm
+name carries a `-cli` suffix only because npm's typosquat rule blocks
+`agentreplay` — it normalizes to the same string as an existing `agent-replay`.
+
 ## Dev setup
 
 Requires Node ≥ 20 and pnpm ≥ 10 (the repo pins `pnpm@10.33.0` via `packageManager`).

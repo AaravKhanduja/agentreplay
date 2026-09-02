@@ -1,6 +1,6 @@
 # AgentReplay — agent guide
 
-Local CLI that turns Claude Code session JSONL into a single self-contained HTML **replay** of how the agent worked — what it explored, how its plan changed, what it edited, where it got stuck, what finally worked. MIT, fully local, no backend. Session format in `docs/session-jsonl-format.md`.
+Local CLI that turns Claude Code session JSONL into a single self-contained HTML **replay** of how the agent worked — what it explored, how its plan changed, what it edited, where it got stuck, what finally worked. MIT, fully local, no backend. Published to npm as **`agentreplay-cli`** (the `-cli` suffix is forced: npm's typosquat rule blocks `agentreplay`, which normalizes to the existing `agent-replay`) while the `bin` stays `agentreplay` — so the install name and the command differ, deliberately. Session format in `docs/session-jsonl-format.md`.
 
 ## Commands
 
