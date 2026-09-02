@@ -17,7 +17,7 @@ jobs:
 
       # No `version:` here on purpose — package.json's `packageManager` field
       # is the single source of truth, and the action errors if both are set.
-      - uses: pnpm/action-setup@v4
+      - uses: pnpm/action-setup@v6
 
       - uses: actions/setup-node@v4
         with:
