@@ -7,11 +7,11 @@
   },
   "packageManager": "pnpm@10.33.0",
   "scripts": {
-    "build": "pnpm --filter @agentreplay/core build && pnpm --filter @agentreplay/viewer build && pnpm --filter agentreplay build",
+    "build": "pnpm --filter @agentreplay/core build && pnpm --filter @agentreplay/viewer build && pnpm --filter agentreplay-cli build && node scripts/check-build.mjs",
     "test": "pnpm -r test",
     "typecheck": "pnpm --filter @agentreplay/core build && pnpm -r typecheck",
     "dev:viewer": "pnpm --filter @agentreplay/viewer dev",
-    "cli": "pnpm --filter agentreplay dev"
+    "cli": "pnpm --filter agentreplay-cli dev"
   },
   "devDependencies": {
     "puppeteer-core": "^25.3.0"
