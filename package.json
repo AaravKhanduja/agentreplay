@@ -14,7 +14,7 @@
     "cli": "pnpm --filter agentreplay-cli dev"
   },
   "devDependencies": {
-    "puppeteer-core": "^25.3.0"
+    "puppeteer-core": "^25.9.0"
   },
   "description": "AgentReplay monorepo \u2014 a local CLI that turns Claude Code sessions into visual replays.",
   "license": "MIT",
