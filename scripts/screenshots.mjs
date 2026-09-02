@@ -56,10 +56,15 @@ try {
   await page.screenshot({ path: path.join(outDir, 'header.png') });
   console.log('wrote header.png');
 
-  // 2. The event graph on its own — the primary artifact.
+  // 2. The event graph on its own — the primary artifact. The topbar is
+  //    sticky, so it overlaps the top of the element's box and leaves a
+  //    clipped fragment of the project path in the shot; hide it for this
+  //    capture only.
   const graph = await page.$('.ar-graph');
   if (graph) {
+    await page.$eval('.ar-topbar', (el) => (el.style.visibility = 'hidden'));
     await graph.screenshot({ path: path.join(outDir, 'graph.png') });
+    await page.$eval('.ar-topbar', (el) => (el.style.visibility = ''));
     console.log('wrote graph.png');
   }
 

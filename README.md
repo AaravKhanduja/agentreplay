@@ -8,6 +8,8 @@ AgentReplay turns Claude Code sessions into visual replays of how the agent work
 
 The output is one self-contained HTML file with one hierarchy: a **header** that names the session, a **ribbon** that maps where the time went, an **event graph** that tells the story in a handful of moments — discovery, root cause, goal changed, decision, implementation, blocked — and an **evidence drawer** that proves every one of them from the transcript. A six-hour session reads in about fifteen seconds, and every claim is one click from the turn that backs it.
 
+![The replay: header, ribbon and the top of the event graph](docs/screenshots/header.png)
+
 ## Quickstart
 
 Run it without installing:
@@ -77,45 +79,9 @@ The **ribbon** is the session's shape in one drawing: phases as blocks, every to
 
 ### The event graph
 
-One chronological column, roughly five to nine moments, selected from everything the analysis detected. This is `agentreplay --demo`, in full:
+![The event graph — the demo session in seven moments](docs/screenshots/graph.png)
 
-```
-▪ EXPLORE · 10:03–10:10
-
-10:03  ○  stripe webhook signatures are failing in prod since
-          yesterday's deploy — datadog is full of…
-
-10:03  ◆  DECISION
-          The fix is to route the exact raw bytes into verification.
-          webhooks/handler.ts · webhooks/verify.ts · Evidence →
-
-▪ EXECUTE · 10:19–10:31
-
-10:19  ○  IMPLEMENTATION ×4
-          4 files changed (+27 −21)
-          src/app.ts · middleware/rawBody.ts · Evidence →
-
-▪ DEBUG · 10:33–10:54
-
-10:44  ○  IMPLEMENTATION
-          src/webhooks/verify.ts (+28 −13)
-
-10:44  ●  DISCOVERY
-          src/lib/stripe.ts resolves webhookSecret once at module load
-          lib/stripe.ts · ↑ first seen 10:03 · Evidence →
-
-10:44  ✕  FAILURE ×5
-          Timestamp outside the tolerance zone (verify.ts:29:27)
-
-▪ VERIFY · 10:55–10:57
-
-10:55  ✓  VERIFIED
-          3 checks passed — Tests, Typecheck, Lint
-```
-
-*(Clock times render in your local timezone.)*
-
-Forty-six tool calls and sixteen turns, compressed to seven moments — and the compression is deduplication and collapsing, not truncation. `IMPLEMENTATION ×4` is one beat covering four edited files; `FAILURE ×5` is one struggle, not five rows.
+One chronological column, roughly five to nine moments, selected from everything the analysis detected — this is `agentreplay --demo`, in full. Forty-six tool calls and sixteen turns, compressed to seven moments, and the compression is deduplication and collapsing rather than truncation: `IMPLEMENTATION ×4` is one beat covering four edited files, `FAILURE ×5` is one struggle rather than five rows.
 
 Three visual weights carry the whole design: quiet `○` steps, key moments (`●` discovery, `◎` root cause, `◆` decision, `↻` goal changed, `✕` failure) with more type and more air, and the outcome (`⚠` / `✓`) ending the story. Phases are small chapter markers, not the artifact.
 
@@ -124,6 +90,8 @@ The `↑ first seen 10:03` link is the part a transcript can't show you: `src/li
 **Every word is the session's.** A node's text is a mechanically clipped sentence from the transcript or a structural fact (`4 files changed (+27 −21)`); the semantic chip carries the verb. AgentReplay selects, clips, groups, ranks and counts — it never writes. If Claude concluded something wrong, the replay shows the wrong conclusion as the session's, never as an AgentReplay finding.
 
 ### The evidence drawer
+
+![The evidence drawer, open on a decision](docs/screenshots/evidence.png)
 
 Clicking any event opens its proof in a panel beside the graph — never inline, so the story never shifts under you. Three levels of compression stay distinct:
 
