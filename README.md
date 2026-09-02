@@ -1,5 +1,9 @@
 # AgentReplay
 
+[![npm](https://img.shields.io/npm/v/agentreplay-cli)](https://www.npmjs.com/package/agentreplay-cli)
+[![CI](https://github.com/AaravKhanduja/agentreplay/actions/workflows/ci.yml/badge.svg)](https://github.com/AaravKhanduja/agentreplay/actions/workflows/ci.yml)
+[![license](https://img.shields.io/npm/l/agentreplay-cli)](LICENSE)
+
 AgentReplay turns Claude Code sessions into visual replays of how the agent worked — what it explored, how its plan changed, what it edited, where it got stuck, and what finally worked.
 
 The output is one self-contained HTML file with one hierarchy: a **header** that names the session, a **ribbon** that maps where the time went, an **event graph** that tells the story in a handful of moments — discovery, root cause, goal changed, decision, implementation, blocked — and an **evidence drawer** that proves every one of them from the transcript. A six-hour session reads in about fifteen seconds, and every claim is one click from the turn that backs it.
@@ -12,13 +16,6 @@ npx agentreplay-cli --demo   # bundled demo session — works without Claude Cod
 ```
 
 Installed globally (`npm i -g agentreplay-cli`) the command is just `agentreplay`.
-
-> Not yet published to npm. Until the first npm release, run from source:
->
-> ```sh
-> pnpm install && pnpm build
-> node packages/cli/dist/index.js --demo
-> ```
 
 AgentReplay reads a session file from `~/.claude/projects/`, analyzes it, and opens a single self-contained HTML file in your browser. No server, no install step beyond the CLI itself.
 
