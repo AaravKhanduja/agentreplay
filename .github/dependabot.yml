@@ -1,0 +1,27 @@
+version: 2
+
+# Grouped on purpose: ungrouped minor/patch bumps on a workspace this size
+# arrive as a dozen PRs a week, which trains you to ignore them. One PR per
+# ecosystem per week stays readable, and majors still come through separately
+# because they are the ones that actually need reading.
+updates:
+  - package-ecosystem: npm
+    directory: /
+    schedule:
+      interval: weekly
+    open-pull-requests-limit: 5
+    groups:
+      minor-and-patch:
+        update-types:
+          - minor
+          - patch
+
+  - package-ecosystem: github-actions
+    directory: /
+    schedule:
+      interval: weekly
+    groups:
+      actions:
+        update-types:
+          - minor
+          - patch

@@ -17,6 +17,15 @@
   ],
   "license": "MIT",
   "author": "Aarav Khanduja",
+  "homepage": "https://github.com/AaravKhanduja/agentreplay#readme",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/AaravKhanduja/agentreplay.git",
+    "directory": "packages/cli"
+  },
+  "bugs": {
+    "url": "https://github.com/AaravKhanduja/agentreplay/issues"
+  },
   "type": "module",
   "bin": {
     "agentreplay": "./dist/index.js"
@@ -33,7 +42,8 @@
   "scripts": {
     "dev": "tsx src/index.ts",
     "build": "tsup && node scripts/copy-assets.mjs",
-    "typecheck": "tsc --noEmit"
+    "typecheck": "tsc --noEmit",
+    "prepublishOnly": "cd ../.. && pnpm build"
   },
   "dependencies": {
     "@inquirer/prompts": "^5.3.8",

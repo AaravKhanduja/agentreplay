@@ -1,0 +1,67 @@
+name: Release
+
+# npm versions are immutable — a bad publish can only be superseded, never
+# fixed. So the pipeline splits in two: `verify` runs unattended, and `publish`
+# waits on the `npm-publish` environment for a human to approve it.
+on:
+  push:
+    tags: ['v*']
+  workflow_dispatch:
+    inputs:
+      dry_run:
+        description: 'Run everything except the publish step'
+        type: boolean
+        default: true
+
+jobs:
+  verify:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: pnpm/action-setup@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: pnpm
+
+      - run: pnpm install --frozen-lockfile
+      - run: pnpm test
+      - run: pnpm build
+
+      # The tarball is built from gitignored output, so check its contents here
+      # rather than discovering a missing binary after it is already published.
+      - name: Inspect the tarball
+        working-directory: packages/cli
+        run: npm pack --dry-run
+
+  publish:
+    needs: verify
+    if: ${{ github.event_name == 'push' || !inputs.dry_run }}
+    runs-on: ubuntu-latest
+    # Pauses here for approval. Configured at:
+    # Settings → Environments → npm-publish → required reviewers.
+    environment: npm-publish
+    permissions:
+      contents: read
+      id-token: write # required for npm provenance
+
+    steps:
+      - uses: actions/checkout@v4
+      - uses: pnpm/action-setup@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: pnpm
+          registry-url: https://registry.npmjs.org
+
+      - run: pnpm install --frozen-lockfile
+      - run: pnpm build
+
+      # --provenance publishes a signed attestation linking this tarball to this
+      # repository and commit, which npm shows on the package page. It needs the
+      # id-token permission above.
+      - name: Publish to npm
+        working-directory: packages/cli
+        run: npm publish --provenance
+        env:
+          NODE_AUTH_TOKEN: ${{ secrets.NPM_TOKEN }}

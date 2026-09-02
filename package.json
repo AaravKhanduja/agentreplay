@@ -17,5 +17,9 @@
     "puppeteer-core": "^25.3.0"
   },
   "description": "AgentReplay monorepo \u2014 a local CLI that turns Claude Code sessions into visual replays.",
-  "license": "MIT"
+  "license": "MIT",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/AaravKhanduja/agentreplay.git"
+  }
 }
