@@ -1,6 +1,6 @@
 'use client';
 
-import { useEffect, useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import type { AnalyzedSession, SessionEvent } from '@agentreplay/core';
 import Markdown from './Markdown';
 import { fmtClock } from '../lib/format';
@@ -32,14 +32,22 @@ export default function EvidenceDrawer({
 }) {
   const turn = analyzed.session.turns[event.turnIndex];
   const speaker = turn?.role === 'user' ? 'You' : 'Claude';
-  // Three levels of compression — graph, evidence, transcript. The full turn
-  // is the deepest one and only renders when asked for; a new selection
-  // starts compressed again.
-  const [turnOpen, setTurnOpen] = useState(false);
-  useEffect(() => setTurnOpen(false), [event]);
+  // Three levels of compression — graph, evidence, transcript. The transcript
+  // is the deepest one and arrives open: reaching it cost two clicks, and it is
+  // what you want almost every time the drawer opens. Collapsing is one click,
+  // and a new selection expands again.
+  const [turnOpen, setTurnOpen] = useState(true);
+  // The panel is reused across selections and scrolls independently, so its
+  // scrollTop survives the swap. With a long turn open that would park a new
+  // event's evidence off-screen above; send it back to the top.
+  const panel = useRef<HTMLElement>(null);
+  useEffect(() => {
+    setTurnOpen(true);
+    if (panel.current !== null) panel.current.scrollTop = 0;
+  }, [event]);
 
   return (
-    <aside className="ar-drawer" aria-label="Evidence">
+    <aside className="ar-drawer" aria-label="Evidence" ref={panel}>
       <header className="ar-drawer-head">
         <span className={`ar-drawer-kind mono ar-drawer-kind--${event.kind}`}>
           <span aria-hidden>{MARK[event.kind]} </span>

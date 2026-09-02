@@ -129,7 +129,7 @@ Clicking any event opens its proof in a panel beside the graph — never inline,
 
 1. **The claim** — the graph node.
 2. **The evidence** — the exact snippet that earned it, with speaker and time (`Claude · 10:03`), and the files behind it.
-3. **The transcript** — `View full turn →` reveals the underlying Claude Code turn, markdown-rendered, with its tool calls. AgentReplay is a lens over Claude Code, not a replacement for it.
+3. **The transcript** — the underlying Claude Code turn, markdown-rendered, with its tool calls, shown in full below the evidence (`Hide full turn` collapses it). AgentReplay is a lens over Claude Code, not a replacement for it.
 
 ## How it works
 
