@@ -28,7 +28,7 @@
   },
   "type": "module",
   "bin": {
-    "agentreplay": "./dist/index.js"
+    "agentreplay": "dist/index.js"
   },
   "files": [
     "dist",
