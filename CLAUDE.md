@@ -1,6 +1,6 @@
 # AgentReplay — agent guide
 
-Local CLI that turns Claude Code session JSONL into a single self-contained HTML **replay** of how the agent worked — what it explored, how its plan changed, what it edited, where it got stuck, what finally worked. MIT, fully local, no backend. Published to npm as **`agentreplay-cli`** (the `-cli` suffix is forced: npm's typosquat rule blocks `agentreplay`, which normalizes to the existing `agent-replay`) while the `bin` stays `agentreplay` — so the install name and the command differ, deliberately. Session format in `docs/session-jsonl-format.md`.
+Local CLI that turns a coding-agent session — Claude Code or OpenAI Codex CLI — into a single self-contained HTML **replay** of how the agent worked — what it explored, how its plan changed, what it edited, where it got stuck, what finally worked. MIT, fully local, no backend. Published to npm as **`agentreplay-cli`** (the `-cli` suffix is forced: npm's typosquat rule blocks `agentreplay`, which normalizes to the existing `agent-replay`) while the `bin` stays `agentreplay` — so the install name and the command differ, deliberately. Session formats in `docs/session-jsonl-format.md` (Claude Code) and `docs/codex-rollout-format.md` (Codex).
 
 ## Commands
 
@@ -19,9 +19,11 @@ Node ≥ 20, pnpm ≥ 9, TypeScript strict everywhere.
 
 ## Layout and dependency direction
 
-- `packages/core` — parser + heuristics. **No UI or CLI deps, depends on nothing internal.** Public API: `analyzeSession(path)` in `src/index.ts`.
+- `packages/core` — parser + heuristics. **No UI or CLI deps, depends on nothing internal.** Public API: `analyzeSession(ref)` in `src/index.ts`. Per-agent readers live in `src/sources/`; everything else is source-agnostic.
 - `packages/viewer` — Next.js 14 App Router, `output: 'export'` only (no SSR, no API routes). `scripts/inline.mjs` post-build inlines everything into one HTML file, written to `packages/cli/assets/viewer.html`.
 - `packages/cli` — commander + inquirer. Injects `JSON.stringify(analyzedSession)` into the viewer HTML at runtime. Never imports viewer code, only the built asset.
+
+**Sources normalize at the parser boundary.** Each agent's reader in `src/sources/` turns its own wire format into `Session`/`Turn`/`ToolCall`, and that is the only place that may know an agent's tool names, tool input shapes, or on-disk layout. Nothing downstream of the normalized layer branches on which agent produced the session: no heuristic tests `ToolCall.name` against a literal, and none reads `ToolCall.input` by a key only one agent uses. A `SessionSource` handle covers discovery and loading only — it cannot ride on `Session` (that would break the JSON round-trip rule below) and it is not in scope inside a heuristic, so anything a heuristic needs must already be a field on the normalized call.
 
 ## Type contract
 
@@ -31,7 +33,7 @@ Node ≥ 20, pnpm ≥ 9, TypeScript strict everywhere.
 
 Pure functions in `packages/core/src` (`phases.ts`, `loops.ts`, `files.ts`, `diffs.ts`, `concepts.ts`, `plans.ts`, `trail.ts`, `verify.ts`, `title.ts`, `checks.ts`, `timeline.ts`, `commands.ts`, `summary.ts`), each with Vitest tests against fixtures in `packages/core/test/fixtures/`.
 
-Rules learned from real sessions, all load-bearing: **a declined tool call is `outcome: 'unknown'`, never an error** (rejected permission prompts were being counted as stuck runs); **phase boundaries never split a debugging episode** (`mergeAcrossDebugRuns` in `phases.ts` — adjacent phases only, ≤10min between attempts, or the breakthrough ends up in a different phase from its stall); **debug stats count loops by turn range, not by which sequence they were filed under**; **reading is reading whatever tool carried it** (`rg`/`sed -n`/`cat`/`git log` are exploration — see `shellKind` in `checks.ts`); **phases cut at work seams**, not only at user turns (plan exit, 10-minute silences), or one assistant turn swallows the session; **only check commands decide pass/fail** (`rg` exiting 1 means no matches); **`.claude/**` is the harness's, not the developer's** (`isHarnessPath`); **durations are active time** (`Phase.activeMs`), since sessions span whole days with hours of idle. Deterministic, no I/O. Degrade to empty results, never throw. Parser rule: schema drifts between Claude Code versions — skip and count bad lines, keep `raw` on every event, never crash.
+Rules learned from real sessions, all load-bearing: **a declined tool call is `outcome: 'unknown'`, never an error** (rejected permission prompts were being counted as stuck runs); **phase boundaries never split a debugging episode** (`mergeAcrossDebugRuns` in `phases.ts` — adjacent phases only, ≤10min between attempts, or the breakthrough ends up in a different phase from its stall); **debug stats count loops by turn range, not by which sequence they were filed under**; **reading is reading whatever tool carried it** (`rg`/`sed -n`/`cat`/`git log` are exploration — see `shellKind` in `checks.ts`); **phases cut at work seams**, not only at user turns (plan exit, 10-minute silences), or one assistant turn swallows the session; **only check commands decide pass/fail** (`rg` exiting 1 means no matches); **the harness's own directory is not the developer's** (`.claude/`, `.codex/` — `isHarnessPath`); **durations are active time** (`Phase.activeMs`), since sessions span whole days with hours of idle. Deterministic, no I/O. Degrade to empty results, never throw. Parser rule: schema drifts between agent versions — skip and count bad lines, keep `raw` on every event, never crash.
 
 The narrative layer (`narrative.ts`, `buildBrief`) is deliberately thin: a session title (`title.ts`), header stats, **at most one** headline sentence — and only when there is a real finding — plus 2–4 ranked takeaways (each with a hard data bar; no generic advice) and a head per phase section. Each head carries an `intent`: the ask behind that phase, **quoted from the session** (a plan quotes its own objective sentence). Quoting the transcript is not narration — but never generate that line. There are no phase stories: structure carries the meaning, so if a view needs a paragraph to explain itself, fix the view. Cross-session facts arrive pre-computed via `BriefExtras`.
 
@@ -83,5 +85,5 @@ Defined in `packages/viewer/app/globals.css`. Rules:
 ## Ethos and scope
 
 - Prefer boring code: clarity over cleverness, no premature abstraction, delete dead code. Strangers read this repo.
-- Out of scope (do not build): web app/hosted version, upload, shareable URLs, accounts, cloud API keys, in-browser models, local HTTP server, light mode, mobile, multi-session dashboards, Cursor/Codex support, watch mode.
+- Out of scope (do not build): web app/hosted version, upload, shareable URLs, accounts, cloud API keys, in-browser models, local HTTP server, light mode, mobile, multi-session dashboards, Cursor support, watch mode.
 - **Never add telemetry or analytics of any kind. Permanent rule.** The only permitted network call in the entire product is to localhost Ollama, and it must remain optional.

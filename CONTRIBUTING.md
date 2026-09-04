@@ -122,7 +122,7 @@ No Tailwind, no chart libraries, no force graphs. Indentation, flex rows and CSS
 - A local HTTP server (the output is a file, on purpose)
 - Light mode, mobile layouts
 - Multi-session dashboards or aggregate stats
-- Cursor/Codex session support
+- Cursor session support (Codex CLI is supported; see `docs/codex-rollout-format.md`)
 - Watch mode / live sessions
 - Any telemetry or analytics — this one is permanent, not just v0
 
