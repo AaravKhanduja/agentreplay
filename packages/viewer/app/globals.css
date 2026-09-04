@@ -259,21 +259,34 @@ ol {
 }
 
 .ar-opening {
-  margin-top: 16px;
+  margin-top: 20px;
   max-width: 68ch;
-  font-size: 15px;
+  font-size: 14px;
   font-style: italic;
   line-height: 1.6;
-  color: var(--text-secondary);
+  color: var(--text-dim);
 }
 
+/* The answer, and the first thing under the title. It reads at display size
+   because it is the sentence the whole artifact exists to deliver — everything
+   below is the route to it, and someone in a hurry should be able to stop
+   here. */
 .ar-headline {
-  margin-top: 22px;
-  max-width: 60ch;
-  font-size: 17px;
-  line-height: 1.45;
-  letter-spacing: -0.005em;
-  color: var(--text-secondary);
+  margin-top: 18px;
+  max-width: 46ch;
+  font-family: var(--font-display);
+  font-size: 25px;
+  font-weight: 600;
+  line-height: 1.32;
+  letter-spacing: -0.015em;
+  text-wrap: balance;
+  color: var(--text-primary);
+}
+
+/* The request drops back to supporting text: the title already says what this
+   was about, and the headline now says how it went. */
+.ar-opening + * {
+  margin-top: 20px;
 }
 
 
@@ -418,7 +431,7 @@ ol {
 
 .ar-graph-phase {
   position: relative;
-  padding-top: 46px;
+  padding-top: 30px;
 }
 
 .ar-graph-phase:first-child {
@@ -431,7 +444,7 @@ ol {
   content: '';
   position: absolute;
   left: var(--graph-line);
-  top: 46px;
+  top: 30px;
   bottom: 10px;
   width: 1px;
   background: var(--border-default);
@@ -493,24 +506,29 @@ ol {
 
 /* ---- nodes: three visual weights, rhythm scales with importance ---- */
 
+/* Spacing is the ranking made visible: a finding gets room around it, a step
+   gets a line. The numbers were tuned on a page that opened with a redundant
+   request node and drew every failure at full size — with those gone the same
+   ratios read as a session padded out to fill a screen, which is exactly the
+   feeling the replay exists to remove. */
 .ar-graph-node {
   position: relative;
-  padding: 20px 0 20px var(--graph-indent);
+  padding: 12px 0 12px var(--graph-indent);
 }
 
 .ar-graph-node--key {
-  padding-top: 36px;
-  padding-bottom: 36px;
+  padding-top: 24px;
+  padding-bottom: 24px;
 }
 
 .ar-graph-node--k-rootCause {
-  padding-top: 40px;
-  padding-bottom: 40px;
+  padding-top: 28px;
+  padding-bottom: 28px;
 }
 
 .ar-graph-node--outcome {
-  padding-top: 40px;
-  padding-bottom: 28px;
+  padding-top: 28px;
+  padding-bottom: 20px;
 }
 
 .ar-graph-time {
@@ -736,15 +754,27 @@ ol {
   box-shadow: 0 0 0 4px var(--bg-app), 0 0 0 6px rgba(34, 211, 238, 0.4);
 }
 
-.ar-graph-seen {
-  font-size: 11px;
-  color: var(--selection);
-  opacity: 0.85;
+/* Its own row under the support line. This is the finding a replay can make
+   that a terminal scrollback cannot — that a file sat open for forty minutes
+   before it mattered — so it is not allowed to be the quietest text here. */
+.ar-graph-echo {
+  margin-top: 7px;
 }
 
-button.ar-graph-seen:hover {
-  opacity: 1;
-  border-bottom: 1px solid var(--selection);
+.ar-graph-seen {
+  font-family: var(--font-mono);
+  font-size: 12px;
+  color: var(--selection);
+  background: none;
+  border: 0;
+  border-bottom: 1px solid transparent;
+  padding: 0 0 1px;
+  cursor: pointer;
+}
+
+button.ar-graph-seen:hover,
+button.ar-graph-seen:focus-visible {
+  border-bottom-color: var(--selection);
 }
 
 /* The affordance, not a control: quiet mono that brightens on hover. The
@@ -984,4 +1014,39 @@ button.ar-graph-seen:hover {
 
 .ar-md > :last-child {
   margin-bottom: 0;
+}
+
+
+/* ---- bookkeeping: a caption between milestones, not a milestone ----------
+   "4 files changed (+27 −21)" is true and worth keeping, but it is not a
+   finding, and at full node weight it takes the same room as the root cause.
+   Implementation steps that selection already ranked `normal` collapse onto
+   one line: chip and label inline, tighter above and below. */
+
+.ar-graph-node--normal.ar-graph-node--k-implementation {
+  padding-top: 10px;
+  padding-bottom: 10px;
+}
+
+.ar-graph-node--normal.ar-graph-node--k-implementation .ar-graph-body {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: baseline;
+  gap: 0 10px;
+}
+
+.ar-graph-node--normal.ar-graph-node--k-implementation .ar-graph-chip {
+  margin: 0;
+}
+
+.ar-graph-node--normal.ar-graph-node--k-implementation .ar-graph-text {
+  font-family: var(--font-sans);
+  font-size: 14px;
+  font-weight: 400;
+  line-height: 1.5;
+  color: var(--text-secondary);
+}
+
+.ar-graph-node--normal.ar-graph-node--k-implementation .ar-graph-support {
+  margin-top: 0;
 }

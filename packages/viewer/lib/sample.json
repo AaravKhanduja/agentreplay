@@ -1032,6 +1032,38 @@
         "relatesTo": null
       },
       {
+        "turnIndex": 9,
+        "timestamp": "2026-07-24T14:33:34.100Z",
+        "phaseIndex": 3,
+        "evidence": [
+          "pnpm test webhooks"
+        ],
+        "source": "structural",
+        "kind": "failure",
+        "text": "ReferenceError: payload is not defined (src/webhooks/verify.ts:17:42)",
+        "weight": 3,
+        "label": "payload is not defined (src/webhooks/verify.ts:17:42)",
+        "rank": "key",
+        "count": 1,
+        "relatesTo": null
+      },
+      {
+        "turnIndex": 9,
+        "timestamp": "2026-07-24T14:33:34.100Z",
+        "phaseIndex": 3,
+        "evidence": [
+          "pnpm test webhooks"
+        ],
+        "source": "structural",
+        "kind": "failure",
+        "text": "Error: No signatures found matching the expected signature for payload. Are you passing the raw request…",
+        "weight": 3,
+        "label": "No signatures found matching the expected signature for payload.",
+        "rank": "key",
+        "count": 3,
+        "relatesTo": null
+      },
+      {
         "kind": "discovery",
         "text": "There it is. src/lib/stripe.ts resolves webhookSecret once at module load, and config/env.ts defaults it to ''.",
         "label": "src/lib/stripe.ts resolves webhookSecret once at module load",
@@ -1077,7 +1109,7 @@
         "weight": 3,
         "label": "Timestamp outside the tolerance zone (src/webhooks/verify.ts:29:27)",
         "rank": "key",
-        "count": 5,
+        "count": 1,
         "relatesTo": null
       },
       {
@@ -1675,7 +1707,7 @@
             "failed": 0,
             "lastOutcome": "success",
             "note": null,
-            "failNote": null,
+            "failures": [],
             "turnIndex": 1,
             "command": "git log --oneline -8"
           }
@@ -1691,7 +1723,7 @@
             "failed": 0,
             "lastOutcome": "success",
             "note": "4 files changed, 21 insertions(+), 15 deletions(-)",
-            "failNote": null,
+            "failures": [],
             "turnIndex": 7,
             "command": "git diff --stat"
           }
@@ -1707,7 +1739,26 @@
             "failed": 5,
             "lastOutcome": "success",
             "note": "Tests 12 passed (12)",
-            "failNote": "Error: Timestamp outside the tolerance zone (src/webhooks/verify.ts:29:27)",
+            "failures": [
+              {
+                "signature": "referenceerror: payload is not defined (src/webhooks/verify.ts)",
+                "note": "ReferenceError: payload is not defined (src/webhooks/verify.ts:17:42)",
+                "firstTurn": 9,
+                "count": 1
+              },
+              {
+                "signature": "error: no signatures found matching the expected signature for payload. are you passing the raw request…",
+                "note": "Error: No signatures found matching the expected signature for payload. Are you passing the raw request…",
+                "firstTurn": 9,
+                "count": 3
+              },
+              {
+                "signature": "error: timestamp outside the tolerance zone (src/webhooks/verify.ts)",
+                "note": "Error: Timestamp outside the tolerance zone (src/webhooks/verify.ts:29:27)",
+                "firstTurn": 11,
+                "count": 1
+              }
+            ],
             "turnIndex": 11,
             "command": "pnpm test webhooks"
           }
@@ -1723,7 +1774,7 @@
             "failed": 0,
             "lastOutcome": "success",
             "note": "Tests 84 passed (84)",
-            "failNote": null,
+            "failures": [],
             "turnIndex": 15,
             "command": "pnpm test"
           },
@@ -1734,7 +1785,7 @@
             "failed": 0,
             "lastOutcome": "success",
             "note": null,
-            "failNote": null,
+            "failures": [],
             "turnIndex": 15,
             "command": "pnpm typecheck"
           },
@@ -1745,7 +1796,7 @@
             "failed": 0,
             "lastOutcome": "success",
             "note": null,
-            "failNote": null,
+            "failures": [],
             "turnIndex": 15,
             "command": "pnpm lint"
           }
@@ -2503,19 +2554,35 @@
         "relatesTo": null
       },
       {
-        "kind": "implementation",
-        "text": "src/webhooks/verify.ts (+28 −13)",
-        "turnIndex": 11,
-        "timestamp": "2026-07-24T14:44:31.700Z",
+        "turnIndex": 9,
+        "timestamp": "2026-07-24T14:33:34.100Z",
         "phaseIndex": 3,
         "evidence": [
-          "src/webhooks/verify.ts"
+          "pnpm test webhooks"
         ],
         "source": "structural",
-        "weight": 2,
-        "label": "src/webhooks/verify.ts (+28 −13)",
+        "kind": "failure",
+        "text": "ReferenceError: payload is not defined (src/webhooks/verify.ts:17:42)",
+        "weight": 3,
+        "label": "payload is not defined (src/webhooks/verify.ts:17:42)",
         "rank": "normal",
         "count": 1,
+        "relatesTo": null
+      },
+      {
+        "turnIndex": 9,
+        "timestamp": "2026-07-24T14:33:34.100Z",
+        "phaseIndex": 3,
+        "evidence": [
+          "pnpm test webhooks"
+        ],
+        "source": "structural",
+        "kind": "failure",
+        "text": "Error: No signatures found matching the expected signature for payload. Are you passing the raw request…",
+        "weight": 3,
+        "label": "No signatures found matching the expected signature for payload.",
+        "rank": "key",
+        "count": 3,
         "relatesTo": null
       },
       {
@@ -2536,19 +2603,19 @@
         "relatesTo": 1
       },
       {
+        "kind": "implementation",
+        "text": "src/webhooks/verify.ts (+28 −13)",
         "turnIndex": 11,
         "timestamp": "2026-07-24T14:44:31.700Z",
         "phaseIndex": 3,
         "evidence": [
-          "pnpm test webhooks"
+          "src/webhooks/verify.ts"
         ],
         "source": "structural",
-        "kind": "failure",
-        "text": "Error: Timestamp outside the tolerance zone (src/webhooks/verify.ts:29:27)",
-        "weight": 3,
-        "label": "Timestamp outside the tolerance zone (src/webhooks/verify.ts:29:27)",
-        "rank": "key",
-        "count": 5,
+        "weight": 2,
+        "label": "src/webhooks/verify.ts (+28 −13)",
+        "rank": "normal",
+        "count": 1,
         "relatesTo": null
       },
       {
@@ -2906,7 +2973,7 @@
         "planText": "## Fix Stripe webhook signature verification\n\n### Root cause\n`app.ts` mounts `express.json()` ahead of the webhook router, so the body reaching `verify.ts` is already parsed — and the verifier re-serializes it with `JSON.stringify(payload)`. Key order, whitespace, and unicode escaping don't survive the round-trip, so the computed HMAC never matches the `stripe-signature` header. The unused `rawBody` middleware suggests someone hit this before and the wiring never landed.\n\n### Changes\n1. **src/app.ts** — mount `express.raw({ type: 'application/json' })` on `/webhooks` ahead of the JSON parser so webhook routes receive the exact bytes.\n2. **src/middleware/rawBody.ts** — replace the dead stream middleware with a `getRawBody(req)` helper that asserts `req.body` is a Buffer.\n3. **src/webhooks/handler.ts** — pass the raw Buffer and the `stripe-signature` header through to the verifier.\n4. **src/webhooks/verify.ts** — accept `string | Buffer` and drop the `JSON.stringify` round-trip.\n5. **src/queue/retry.ts** — `enqueueRetry` currently persists the parsed JSON and drops the headers, so replayed events can never be re-verified. Store the raw payload (base64) plus the original `stripe-signature` header on the job, and re-verify on replay before processing.\n\n### Retry queue details\n- Job shape becomes `{ rawPayload: string, signature: string, reason: string }`.\n- The worker decodes the payload and calls the verifier with a `replay` flag; replays are re-delivered events that can be days old, so replay verification needs its own timestamp tolerance.\n- Jobs already queued with the old shape should be logged and dropped, not crash the worker.\n\n### Verification\n`pnpm test webhooks` — extend `tests/webhooks/verify.test.ts` with a replayed-event case on top of the existing valid/invalid/expired signature tests.",
         "triggerUserText": "close, but also cover the retry queue — enqueueRetry in src/queue/retry.ts only stores the parsed json and drops the headers, so replays will keep failing verification forever even after this fix",
         "changeKind": "expanded",
-        "diffFromPrevious": "Index: plan\n===================================================================\n--- plan\n+++ plan\n@@ -7,7 +7,13 @@\n 1. **src/app.ts** — mount `express.raw({ type: 'application/json' })` on `/webhooks` ahead of the JSON parser so webhook routes receive the exact bytes.\n 2. **src/middleware/rawBody.ts** — replace the dead stream middleware with a `getRawBody(req)` helper that asserts `req.body` is a Buffer.\n 3. **src/webhooks/handler.ts** — pass the raw Buffer and the `stripe-signature` header through to the verifier.\n 4. **src/webhooks/verify.ts** — accept `string | Buffer` and drop the `JSON.stringify` round-trip.\n+5. **src/queue/retry.ts** — `enqueueRetry` currently persists the parsed JSON and drops the headers, so replayed events can never be re-verified. Store the raw payload (base64) plus the original `stripe-signature` header on the job, and re-verify on replay before processing.\n \n+### Retry queue details\n\\ No newline at end of file\n+- Job shape becomes `{ rawPayload: string, signature: string, reason: string }`.\n+- The worker decodes the payload and calls the verifier with a `replay` flag; replays are re-delivered events that can be days old, so replay verification needs its own timestamp tolerance.\n+- Jobs already queued with the old shape should be logged and dropped, not crash the worker.\n+\n ### Verification\n-`pnpm test webhooks` — the 12 tests in `tests/webhooks/verify.test.ts` cover valid, invalid, and expired signatures.\n+`pnpm test webhooks` — extend `tests/webhooks/verify.test.ts` with a replayed-event case on top of the existing valid/invalid/expired signature tests.\n\\ No newline at end of file\n",
+        "diffFromPrevious": "Index: plan\n===================================================================\n--- plan\n+++ plan\n@@ -7,7 +7,13 @@\n 1. **src/app.ts** — mount `express.raw({ type: 'application/json' })` on `/webhooks` ahead of the JSON parser so webhook routes receive the exact bytes.\n 2. **src/middleware/rawBody.ts** — replace the dead stream middleware with a `getRawBody(req)` helper that asserts `req.body` is a Buffer.\n 3. **src/webhooks/handler.ts** — pass the raw Buffer and the `stripe-signature` header through to the verifier.\n 4. **src/webhooks/verify.ts** — accept `string | Buffer` and drop the `JSON.stringify` round-trip.\n+5. **src/queue/retry.ts** — `enqueueRetry` currently persists the parsed JSON and drops the headers, so replayed events can never be re-verified. Store the raw payload (base64) plus the original `stripe-signature` header on the job, and re-verify on replay before processing.\n \n+### Retry queue details\n+- Job shape becomes `{ rawPayload: string, signature: string, reason: string }`.\n+- The worker decodes the payload and calls the verifier with a `replay` flag; replays are re-delivered events that can be days old, so replay verification needs its own timestamp tolerance.\n+- Jobs already queued with the old shape should be logged and dropped, not crash the worker.\n+\n ### Verification\n-`pnpm test webhooks` — the 12 tests in `tests/webhooks/verify.test.ts` cover valid, invalid, and expired signatures.\n\\ No newline at end of file\n+`pnpm test webhooks` — extend `tests/webhooks/verify.test.ts` with a replayed-event case on top of the existing valid/invalid/expired signature tests.\n\\ No newline at end of file\n",
         "steps": [
           {
             "text": "src/app.ts — mount express.raw({ type: 'application/json' }) on…",

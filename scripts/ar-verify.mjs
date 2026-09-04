@@ -63,7 +63,23 @@ try {
   // One representation of the session: header, ribbon, graph, and nothing else.
   const nodes = await count('.ar-graph-node');
   check('event graph rendered', nodes > 0, `${nodes} nodes`);
-  check('graph is compressed', nodes > 0 && nodes <= 12, `${nodes} nodes (target ~5–9 plus the request)`);
+  check('graph is compressed', nodes > 0 && nodes <= 12, `${nodes} nodes (target ~5–9)`);
+
+  // The debug chapter once rendered its thirteen-minute stall *after* the
+  // discovery that ended it, because a command group carried its last run's
+  // turn. A story that runs backwards is worse than no story.
+  const times = await page.$$eval('.ar-graph-time', (els) => els.map((el) => el.textContent.trim()));
+  const ordered = times.every((t, i) => i === 0 || times[i - 1] <= t);
+  check('story runs forwards', ordered, ordered ? times.join(' → ') : `out of order: ${times.join(' → ')}`);
+
+  // The finding, not the map, is what someone came back for.
+  const headlineAboveRibbon = await page.evaluate(() => {
+    const headline = document.querySelector('.ar-headline');
+    const ribbon = document.querySelector('.ar-ribbon');
+    if (!headline || !ribbon) return false;
+    return headline.getBoundingClientRect().top < ribbon.getBoundingClientRect().top;
+  });
+  check('the finding leads the page', headlineAboveRibbon);
   check('ribbon rendered', (await count('.ar-ribbon-phase')) > 0);
   check('every ribbon colour is named', (await count('.ar-ribbon-key-item')) >= (await count('.ar-ribbon-phase')) - 2);
   for (const [label, sel] of [

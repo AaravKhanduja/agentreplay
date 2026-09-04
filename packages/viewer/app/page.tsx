@@ -87,7 +87,7 @@ function Replay({ analyzed, brief }: ViewerPayload) {
         <Header brief={brief}>
           <Ribbon analyzed={analyzed} />
         </Header>
-        <EventGraph analyzed={analyzed} brief={brief} />
+        <EventGraph analyzed={analyzed} />
         <Footer />
       </main>
     </div>

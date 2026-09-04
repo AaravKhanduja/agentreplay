@@ -1,9 +1,9 @@
 'use client';
 
 import { useEffect, useState } from 'react';
-import type { AnalyzedSession, Brief, EventKind, SessionEvent } from '@agentreplay/core';
+import type { AnalyzedSession, EventKind, SessionEvent } from '@agentreplay/core';
 import EvidenceDrawer from './EvidenceDrawer';
-import { fmtClock, tail } from '../lib/format';
+import { durationMs, fmtClock, fmtDuration, tail } from '../lib/format';
 
 /**
  * The event graph: one chronological column that tells the shortest truthful
@@ -14,7 +14,9 @@ import { fmtClock, tail } from '../lib/format';
  * The column draws `analyzed.replay` — core's replay selection (replay.ts):
  * detection finds every checkable moment, selection keeps the few that carry
  * the arc. The viewer adds only the opening request and the drawing; nothing
- * here decides what happened, and no string is authored on this side.
+ * here decides what happened, and no string is authored on this side. The
+ * request itself is the header's, not a node: printing it in both places cost
+ * the reader a screen before the first finding.
  * Evidence never opens inline: the graph's vertical layout is the story, and
  * proof appears in a drawer beside it so selecting an event never moves the
  * events below it.
@@ -46,8 +48,8 @@ export const CHIP: Record<EventKind, string> = {
   blocker: 'blocked',
 };
 
-export default function EventGraph({ analyzed, brief }: { analyzed: AnalyzedSession; brief: Brief }) {
-  const moments = [...opening(analyzed, brief), ...analyzed.replay];
+export default function EventGraph({ analyzed }: { analyzed: AnalyzedSession }) {
+  const moments = analyzed.replay;
   const [selected, setSelected] = useState<number | null>(null);
   /* Hovering a file lights it up everywhere else it appears. The finding a
      replay can show that scrollback cannot is that a file was open long
@@ -177,8 +179,11 @@ function Node({
           </span>
         </button>
 
+        {/* Two, not three: past a pair this reads as filing rather than
+            support. Which two is core's call — the viewer only ever takes
+            them in order. */}
         <p className="ar-graph-support mono">
-          {event.evidence.slice(0, 3).map((item, i) => (
+          {event.evidence.slice(0, 2).map((item, i) => (
             <button
               key={i}
               type="button"
@@ -193,50 +198,47 @@ function Node({
               {tail(item, 2)}
             </button>
           ))}
-          {seenAt !== undefined &&
-            (anchor !== null ? (
-              <button
-                className="ar-graph-seen"
-                onClick={(click) => {
-                  click.stopPropagation();
-                  document.getElementById(anchor)?.scrollIntoView({ behavior: 'smooth', block: 'center' });
-                }}
-              >
-                ↑ first seen {fmtClock(seenAt)}
-              </button>
-            ) : (
-              <span className="ar-graph-seen">↑ first seen {fmtClock(seenAt)}</span>
-            ))}
         </p>
+
+        {/* Its own row, and it says the gap out loud. That a file had been open
+            since 10:03 and took another 41 minutes to matter is the one thing
+            a replay knows that scrollback does not — it should not be the
+            dimmest text in the node. The elapsed figure is arithmetic over two
+            timestamps the session already carries. */}
+        {seenAt !== undefined && (
+          <p className="ar-graph-echo mono">
+            <Callback
+              seenAt={seenAt}
+              at={event.timestamp}
+              anchor={anchor}
+            />
+          </p>
+        )}
       </div>
     </article>
   );
 }
 
-/**
- * The graph's beginning: the request, verbatim, as a quiet node. Built from
- * `brief.openingPrompt` — presentation of an existing verbatim string, not a
- * new extraction.
- */
-function opening(analyzed: AnalyzedSession, brief: Brief): SessionEvent[] {
-  if (brief.openingPrompt === null) return [];
-  const turn = analyzed.session.turns[0];
-  return [
-    {
-      kind: 'question',
-      text: brief.openingPrompt,
-      label: brief.openingPrompt,
-      turnIndex: 0,
-      timestamp: turn?.timestamp ?? analyzed.session.startedAt,
-      phaseIndex: 0,
-      evidence: [],
-      source: 'quoted',
-      weight: 0,
-      rank: 'normal',
-      count: 1,
-      relatesTo: null,
-    },
-  ];
+/** `↑ first opened 10:03 · 41m earlier`, linked to that node when it is drawn. */
+function Callback({ seenAt, at, anchor }: { seenAt: string; at: string; anchor: string | null }) {
+  const gap = durationMs(seenAt, at);
+  const label = `↑ first opened ${fmtClock(seenAt)}`;
+  const since = gap > 60_000 ? ` · ${fmtDuration(gap)} earlier` : '';
+
+  if (anchor === null) return <span className="ar-graph-seen">{label}{since}</span>;
+  return (
+    <button
+      type="button"
+      className="ar-graph-seen"
+      onClick={(click) => {
+        click.stopPropagation();
+        document.getElementById(anchor)?.scrollIntoView({ behavior: 'smooth', block: 'center' });
+      }}
+    >
+      {label}
+      {since}
+    </button>
+  );
 }
 
 function groupByPhase(
