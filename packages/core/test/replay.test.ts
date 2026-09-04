@@ -300,3 +300,49 @@ describe('selectReplayEvents — ordering', () => {
     expect([...turns].sort((a, b) => a - b)).toEqual(turns);
   });
 });
+
+describe('selectReplayEvents — failure weight', () => {
+  // The discovery has to be here and has to extract: `capFailuresPerPhase`
+  // only keeps a weaker failure when some finding in the same phase comes
+  // after it, on the grounds that it led somewhere.
+  const twoKindsOfFailure = () =>
+    sessionWith([
+      userTurn('the webhook tests are red'),
+      assistantTurn('Reading the verification path.', [tc.read('src/webhooks/verify.ts')], { gapSec: 600 }),
+      assistantTurn('Rewriting the verifier.', [
+        tc.multiEdit('src/webhooks/verify.ts', [{ old_string: 'a', new_string: 'b' }]),
+        tc.bash('pnpm test webhooks', { error: 'ReferenceError: payload is not defined' }),
+        tc.bash('pnpm test webhooks', { error: 'Error: no signatures found matching the expected signature' }),
+        tc.bash('pnpm test webhooks', { error: 'Error: no signatures found matching the expected signature' }),
+        tc.bash('pnpm test webhooks', { error: 'Error: no signatures found matching the expected signature' }),
+      ], { gapSec: 600 }),
+      assistantTurn('There it is. src/lib/stripe.ts resolves webhookSecret once at module load, and config/env.ts defaults it to an empty string, so every HMAC here is computed with an empty secret.', [
+        tc.read('src/lib/stripe.ts'),
+        tc.edit('src/webhooks/verify.ts', 'x', 'y'),
+        tc.bash('pnpm test webhooks'),
+      ], { gapSec: 780 }),
+      userTurn('ship it', { gapSec: 60 }),
+    ]);
+
+  it('keeps a one-off failure but gives the repeated one the weight', () => {
+    // The wall a session hit three times is where the time went. A transient
+    // error on the way past it is still true, and still shown — it just does
+    // not get to claim the same room.
+    const failures = replayOf(twoKindsOfFailure()).filter((event) => event.kind === 'failure');
+
+    const repeated = failures.find((event) => event.count > 1);
+    const oneOff = failures.find((event) => event.count === 1);
+
+    expect(repeated?.rank).toBe('key');
+    expect(oneOff).toBeDefined();
+    expect(oneOff?.rank).toBe('normal');
+  });
+
+  it('demotes without dropping — the one-off survives selection', () => {
+    // Demotion rebuilds the event, and `scores` is keyed by object identity.
+    // Running it before `pick` takes the rebuilt event out of the score map,
+    // where it scores zero and disappears instead of going quiet.
+    const labels = replayOf(twoKindsOfFailure()).map((event) => event.label);
+    expect(labels.some((label) => label.includes('payload is not defined'))).toBe(true);
+  });
+});

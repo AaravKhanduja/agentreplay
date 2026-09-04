@@ -38,7 +38,10 @@ export function selectReplayEvents(analyzed: AnalyzedSession): SessionEvent[] {
   const scores = new Map(events.map((event) => [event, scoreOf(event, events)]));
   events = capFailuresPerPhase(events, scores);
 
-  const chosen = pick(analyzed, events, scores);
+  // After `pick`, never before: `scores` is keyed by object identity, so
+  // replacing an event upstream of scoring drops it out of the map and it
+  // silently scores zero.
+  const chosen = demoteOneOffFailures(pick(analyzed, events, scores));
 
   // Chronological on the page, whatever order importance picked them in.
   // Several moments can share a turn, and there the tiebreak has to be causal:
@@ -252,6 +255,29 @@ function scoreOf(event: SessionEvent, all: SessionEvent[]): number {
  * finding in its phase (it caused the breakthrough; that transition is the
  * story and stays).
  */
+/**
+ * A failure that happened once, in a phase that also holds one that repeated,
+ * drops to `normal`.
+ *
+ * Both are true and both stay on the page, but they are not the same size of
+ * fact: the wall a session hit five times is what the time went to, and a
+ * transient error on the way past it should not claim the same room. Rank is
+ * how much of the page a moment gets, so this is the right knob — dropping the
+ * one-off outright would hide something that actually happened.
+ */
+function demoteOneOffFailures(events: SessionEvent[]): SessionEvent[] {
+  const repeated = new Set(
+    events.filter((event) => event.kind === 'failure' && event.count > 1).map((event) => event.phaseIndex),
+  );
+  if (repeated.size === 0) return events;
+
+  return events.map((event) =>
+    event.kind === 'failure' && event.count === 1 && repeated.has(event.phaseIndex)
+      ? { ...event, rank: 'normal' as const }
+      : event,
+  );
+}
+
 function capFailuresPerPhase(events: SessionEvent[], scores: Map<SessionEvent, number>): SessionEvent[] {
   const dropped = new Set<SessionEvent>();
   const phases = new Set(events.filter((event) => event.kind === 'failure').map((event) => event.phaseIndex));
