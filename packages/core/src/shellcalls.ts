@@ -1,0 +1,61 @@
+/**
+ * Shell commands that edit files, expanded into the calls the heuristics read.
+ *
+ * An agent with no edit tool does all its editing through the shell, and even
+ * one that has edit tools reaches for a heredoc sometimes. Either way the edit
+ * is invisible: `category` is 'bash', `filePath` is null, so `files.ts` builds
+ * no node for it, `diffs.ts` records no attempt, and — the expensive one —
+ * `loops.ts` never starts a debug loop, because a loop begins at a write with a
+ * path. A session that edited and re-ran a test twenty times reads as clean.
+ *
+ * The fix is to say what happened in the vocabulary the rest of the code
+ * already speaks, at the one place allowed to know a source's shapes.
+ */
+
+import { shellWrites } from './checks.js';
+import type { ToolCall } from './types.js';
+
+/**
+ * A shell call, preceded by one write call per file it edits.
+ *
+ * The order is the whole point. `loops.ts` finds a write and then scans
+ * *forward* for the next bash call to see whether the fix held; a single call
+ * that was both write and bash would find itself, and the scan would collapse.
+ * Emitting the writes first leaves the shell call sitting where the check that
+ * follows an edit normally sits, so every heuristic downstream works unchanged.
+ */
+export function expandShellWrites(call: ToolCall, projectPath: string): ToolCall[] {
+  const command = typeof call.input['command'] === 'string' ? call.input['command'] : '';
+  if (command === '') return [call];
+
+  const writes = shellWrites(command, projectPath);
+  if (writes.length === 0) return [call];
+
+  const synthetic = writes.map((write, i): ToolCall => ({
+    // Suffixed so ids stay unique; nothing pairs a result to these.
+    id: call.id === '' ? '' : `${call.id}#w${i}`,
+    // The command is the truth about what ran. Naming it 'Edit' would be a
+    // tidier lie, and the evidence drawer shows this name to the reader.
+    name: command.trim().split(/\s+/)[0] ?? 'shell',
+    category: 'write',
+    timestamp: call.timestamp,
+    durationMs: null,
+    // The shape `extractDiff` reads, so no heuristic needs a shell branch.
+    input: { command, ...editInput(write.edits) },
+    filePath: write.path,
+    outcome: call.outcome,
+    errorText: call.errorText,
+    resultPreview: call.resultPreview,
+    synthetic: true,
+  }));
+
+  return [...synthetic, call];
+}
+
+/** One pair is an Edit; several are a MultiEdit. Both shapes already decode. */
+function editInput(edits: Array<{ oldText: string; newText: string }>): Record<string, unknown> {
+  const first = edits[0];
+  if (first === undefined) return {};
+  if (edits.length === 1) return { old_string: first.oldText, new_string: first.newText };
+  return { edits: edits.map((e) => ({ old_string: e.oldText, new_string: e.newText })) };
+}

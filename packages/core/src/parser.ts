@@ -11,6 +11,7 @@ import { readFile } from 'node:fs/promises';
 import path from 'node:path';
 
 import { decodeProjectDir } from './discover.js';
+import { expandShellWrites } from './shellcalls.js';
 import type { ParsedSession, Session, ToolCall, ToolCategory, Turn } from './types.js';
 
 const INPUT_STRING_MAX = 4000;
@@ -143,6 +144,8 @@ export function parseSessionJsonl(
    */
   let currentAssistant: Turn | null = null;
   const pendingCalls = new Map<string, ToolCall>();
+  /** Bash calls, revisited after their results arrive so writes carry an outcome. */
+  const shellCalls: ToolCall[] = [];
   let inPlanMode = false;
   let model: string | null = null;
   let totalTokens: number | null = null;
@@ -302,6 +305,9 @@ export function parseSessionJsonl(
         };
         currentAssistant.toolCalls.push(call);
         if (id !== '') pendingCalls.set(id, call);
+        // A heredoc or `sed -i` is an edit, whatever tool carried it. Recorded
+        // once the result is in, so the synthetic writes inherit its outcome.
+        if (call.category === 'bash') shellCalls.push(call);
         // Approving a plan ends the planning, mid-turn. Everything after it is
         // execution and must not inherit the plan label.
         if (name === 'ExitPlanMode') {
@@ -315,6 +321,23 @@ export function parseSessionJsonl(
     if (exitedPlan) {
       currentAssistant = null;
       exitedPlan = false;
+    }
+  }
+
+  // Expanded last: a shell edit's outcome is only known once its result has
+  // been matched, and the synthetic writes copy it.
+  if (shellCalls.length > 0) {
+    const expansions = new Map<ToolCall, ToolCall[]>();
+    for (const call of shellCalls) {
+      const expanded = expandShellWrites(call, projectPath);
+      if (expanded.length > 1) expansions.set(call, expanded);
+    }
+    if (expansions.size > 0) {
+      for (const turn of turns) {
+        if (turn.toolCalls.some((call) => expansions.has(call))) {
+          turn.toolCalls = turn.toolCalls.flatMap((call) => expansions.get(call) ?? [call]);
+        }
+      }
     }
   }
 

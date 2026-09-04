@@ -26,6 +26,7 @@ import type { AnalyzedSession, AnalyzeOptions, AnalyzeResult, BriefExtras, Sessi
 
 export * from './types.js';
 export { parseSessionFile, parseSessionJsonl } from './parser.js';
+export { expandShellWrites } from './shellcalls.js';
 export {
   discoverSessions,
   resolveSessionRef,

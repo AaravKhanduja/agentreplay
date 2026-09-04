@@ -79,7 +79,12 @@ export function buildBrief(analyzed: AnalyzedSession, extras: BriefExtras = {}):
 /** Header stats. No duration: the topbar prints it and the phase bars encode it. */
 function buildStats(analyzed: AnalyzedSession): BriefStats {
   const { filesChanged, added, removed } = countChanges(analyzed);
-  const toolCalls = analyzed.session.turns.reduce((n, turn) => n + turn.toolCalls.length, 0);
+  // Synthetic writes are edits we read out of a shell command, not calls the
+  // agent made — counting them would inflate the number the header reports.
+  const toolCalls = analyzed.session.turns.reduce(
+    (n, turn) => n + turn.toolCalls.filter((call) => !call.synthetic).length,
+    0,
+  );
   const check = sessionCheck(analyzed);
   // A session that ended blocked did not "fail its typecheck" — it stopped.
   if (pickBlocker(analyzed.events) !== null) {

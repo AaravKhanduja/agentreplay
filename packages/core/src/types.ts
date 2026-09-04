@@ -55,6 +55,12 @@ export interface ToolCall {
   errorText: string | null;
   /** First ~300 chars of the result. */
   resultPreview: string | null;
+  /**
+   * Derived by the parser from a shell command that edits a file, rather than
+   * reported by the agent. Real work, so the heuristics count it — but not a
+   * call the agent made, so the header's tool count leaves it out.
+   */
+  synthetic?: boolean;
 }
 
 export interface Turn {

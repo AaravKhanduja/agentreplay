@@ -142,3 +142,73 @@ describe('shellKind', () => {
     expect(shellKind('pnpm test')).toBe('check');
   });
 });
+
+describe('a shell edit reaches the heuristics', () => {
+  const heredoc = "cat > src/author.ts <<'EOF'\nexport const authorId = 1;\nEOF";
+
+  const session = (): string =>
+    [
+      JSON.stringify({
+        type: 'user',
+        uuid: 'u1',
+        parentUuid: null,
+        timestamp: '2026-01-01T10:00:00.000Z',
+        cwd: '/project',
+        message: { role: 'user', content: 'fix the author field' },
+      }),
+      JSON.stringify({
+        type: 'assistant',
+        uuid: 'a1',
+        parentUuid: 'u1',
+        timestamp: '2026-01-01T10:00:01.000Z',
+        cwd: '/project',
+        message: {
+          id: 'm1',
+          model: 'claude-fable-5',
+          content: [{ type: 'tool_use', id: 'tu1', name: 'Bash', input: { command: heredoc } }],
+        },
+      }),
+      JSON.stringify({
+        type: 'user',
+        uuid: 'r1',
+        parentUuid: 'a1',
+        timestamp: '2026-01-01T10:00:02.000Z',
+        cwd: '/project',
+        message: { role: 'user', content: [{ type: 'tool_result', tool_use_id: 'tu1', content: 'ok' }] },
+      }),
+    ].join('\n');
+
+  it('becomes a write call with a path, ahead of the shell call it came from', async () => {
+    const { parseSessionJsonl } = await import('../src/parser.js');
+    const { session: parsed } = parseSessionJsonl(session(), { sessionId: 's' });
+    const calls = parsed.turns.flatMap((t) => t.toolCalls);
+
+    expect(calls.map((c) => c.category)).toEqual(['write', 'bash']);
+    expect(calls[0]?.filePath).toBe('src/author.ts');
+    expect(calls[0]?.synthetic).toBe(true);
+    // The name stays the command that ran; only the meaning is normalized.
+    expect(calls[0]?.name).toBe('cat');
+    expect(calls[1]?.synthetic).toBeUndefined();
+  });
+
+  it('shows up as an edited file and an edit history', async () => {
+    const { parseSessionJsonl } = await import('../src/parser.js');
+    const { buildFileAccess } = await import('../src/files.js');
+    const { buildEditHistories } = await import('../src/diffs.js');
+    const { session: parsed } = parseSessionJsonl(session(), { sessionId: 's' });
+
+    expect(buildFileAccess(parsed).map((f) => [f.path, f.writes])).toEqual([['src/author.ts', 1]]);
+    const [history] = buildEditHistories(parsed);
+    expect(history?.path).toBe('src/author.ts');
+    expect(history?.attempts[0]?.diff).toEqual([{ kind: 'add', text: 'export const authorId = 1;' }]);
+  });
+
+  it('is left out of the header tool count — it is our reading, not a call', async () => {
+    const { parseSessionJsonl } = await import('../src/parser.js');
+    const { analyzeParsedSession } = await import('../src/index.js');
+    const { buildBrief } = await import('../src/narrative.js');
+    const { session: parsed } = parseSessionJsonl(session(), { sessionId: 's' });
+
+    expect(buildBrief(analyzeParsedSession(parsed)).stats.toolCalls).toBe(1);
+  });
+});
