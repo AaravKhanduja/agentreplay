@@ -26,17 +26,17 @@ function asString(value: unknown): string | null {
   return typeof value === 'string' ? value : null;
 }
 
-/** old/new string pairs from an Edit, MultiEdit or Write tool input. */
+/**
+ * Old/new string pairs from a write call's input.
+ *
+ * Dispatched on the shape of the input rather than the name of the tool: the
+ * three shapes below are what an edit looks like, and a source whose agent
+ * calls its edit tool something else — or edits through the shell — normalizes
+ * to one of them at the parser boundary rather than being special-cased here.
+ */
 function editPairs(call: ToolCall): EditPair[] {
-  if (call.name === 'Edit') {
-    const oldText = asString(call.input['old_string']);
-    const newText = asString(call.input['new_string']);
-    if (oldText === null && newText === null) return [];
-    return [{ oldText: oldText ?? '', newText: newText ?? '' }];
-  }
-  if (call.name === 'MultiEdit') {
-    const edits = call.input['edits'];
-    if (!Array.isArray(edits)) return [];
+  const edits = call.input['edits'];
+  if (Array.isArray(edits)) {
     const pairs: EditPair[] = [];
     for (const edit of edits) {
       if (typeof edit !== 'object' || edit === null) continue;
@@ -48,13 +48,16 @@ function editPairs(call: ToolCall): EditPair[] {
     }
     return pairs;
   }
-  if (call.name === 'Write') {
-    const content = asString(call.input['content']);
-    if (content === null) return [];
-    // A full-file Write counts as one add-only attempt.
-    return [{ oldText: '', newText: content }];
+
+  const oldText = asString(call.input['old_string']);
+  const newText = asString(call.input['new_string']);
+  if (oldText !== null || newText !== null) {
+    return [{ oldText: oldText ?? '', newText: newText ?? '' }];
   }
-  return [];
+
+  const content = asString(call.input['content']);
+  // Writing a whole file counts as one add-only attempt.
+  return content === null ? [] : [{ oldText: '', newText: content }];
 }
 
 /** Del/add lines for a write tool call, capped at 20 lines. */
