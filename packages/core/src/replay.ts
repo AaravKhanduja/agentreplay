@@ -40,13 +40,30 @@ export function selectReplayEvents(analyzed: AnalyzedSession): SessionEvent[] {
 
   const chosen = pick(analyzed, events, scores);
 
-  // Chronological on the page, whatever order importance picked them in;
-  // within one turn the outcome goes last so the story ends on the ending.
-  const RANK_ORDER = { normal: 0, key: 1, outcome: 2 } as const;
-  return chosen.sort(
-    (a, b) => a.turnIndex - b.turnIndex || RANK_ORDER[a.rank] - RANK_ORDER[b.rank],
-  );
+  // Chronological on the page, whatever order importance picked them in.
+  // Several moments can share a turn, and there the tiebreak has to be causal:
+  // a turn that hit an error, worked out why, and fixed it reads as nonsense
+  // if the discovery prints above the failure that prompted it.
+  return chosen.sort((a, b) => a.turnIndex - b.turnIndex || CAUSAL[a.kind] - CAUSAL[b.kind]);
 }
+
+/**
+ * What went wrong, then what was understood, then what was done about it, then
+ * how it ended. Ranking by importance instead put every `normal` moment first,
+ * which reliably printed a fix above the failure it answered.
+ */
+const CAUSAL: Record<EventKind, number> = {
+  question: 0,
+  blocker: 1,
+  failure: 2,
+  hypothesis: 3,
+  discovery: 4,
+  rootCause: 5,
+  pivot: 6,
+  decision: 7,
+  implementation: 8,
+  verification: 9,
+};
 
 // ---------------------------------------------------------------------------
 // Deduplication and demotion

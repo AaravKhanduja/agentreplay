@@ -436,10 +436,23 @@ function structuralEvents(analyzed: AnalyzedSession): SessionEvent[] {
       // happened, the pass is where it ended, and "blocked vs verified" needs
       // the second one. The failure quotes the run that failed — `note` by then
       // describes the run that passed.
-      if (group.failed > 0) {
+      //
+      // One event per distinct failure, dated from the first run that failed
+      // that way. Both matter: pooling them puts a count on an error that
+      // happened once, and dating from the last run sorts a stall after the
+      // discovery that ended it.
+      for (const failure of group.failures) {
+        const failTurn = analyzed.session.turns[failure.firstTurn];
         events.push({
-          ...event({ ...at, kind: 'failure', text: group.failNote ?? `${group.label} failed`, weight: 3 }),
-          count: group.failed,
+          ...event({
+            ...at,
+            turnIndex: failure.firstTurn,
+            timestamp: failTurn?.timestamp ?? at.timestamp,
+            kind: 'failure',
+            text: failure.note ?? `${group.label} failed`,
+            weight: 3,
+          }),
+          count: failure.count,
         });
       }
       if (group.kind === 'check' && group.lastOutcome === 'success') {

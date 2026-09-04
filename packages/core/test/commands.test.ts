@@ -153,3 +153,69 @@ describe('summarizeCommands', () => {
     expect(groupsOf(session)).toEqual([]);
   });
 });
+
+describe('failure grouping', () => {
+  const runs = (errors: Array<string | null>) =>
+    errors.map((error) =>
+      assistantTurn(
+        'running the tests',
+        [error === null ? tc.bash('pnpm test') : tc.bash('pnpm test', { error })],
+      ),
+    );
+
+  it('splits a command that failed more than one way', () => {
+    // Five runs of one command, three of them the same wall. Pooling them into
+    // "failed ×5" puts a count on whichever error happened to be last.
+    const groups = groupsOf(
+      sessionWith([
+        userTurn('tests are red'),
+        ...runs([
+          'Error: no signatures found matching the expected signature',
+          'Error: no signatures found matching the expected signature',
+          'Error: no signatures found matching the expected signature',
+          'Error: timestamp outside the tolerance zone',
+          null,
+        ]),
+      ]),
+    );
+
+    const tests = groups.find((group) => group.label === 'Tests');
+    expect(tests?.runs).toBe(5);
+    expect(tests?.failed).toBe(4);
+    expect(tests?.failures.map((failure) => failure.count)).toEqual([3, 1]);
+    expect(tests?.failures[0]?.note).toContain('no signatures found');
+  });
+
+  it('dates a repeated failure from the run that started it', () => {
+    // The turn a stall *ends* on is the turn that broke it, so dating the
+    // failure there sorts it after its own resolution.
+    const groups = groupsOf(
+      sessionWith([
+        userTurn('tests are red'),
+        ...runs(['Error: same wall', 'Error: same wall', 'Error: same wall']),
+      ]),
+    );
+
+    const tests = groups.find((group) => group.label === 'Tests');
+    expect(tests?.turnIndex).toBe(3); // the group still points at the last run
+    expect(tests?.failures[0]?.firstTurn).toBe(1);
+    expect(tests?.failures[0]?.count).toBe(3);
+  });
+
+  it('ignores line and column drift when matching failures', () => {
+    // `errorSignature` strips positions, so the same error from a shifting line
+    // number stays one failure rather than becoming three.
+    const groups = groupsOf(
+      sessionWith([
+        userTurn('tests are red'),
+        ...runs([
+          'Error: bad payload (src/verify.ts:17:42)',
+          'Error: bad payload (src/verify.ts:22:8)',
+          'Error: bad payload (src/verify.ts:31:12)',
+        ]),
+      ]),
+    );
+
+    expect(groups.find((group) => group.label === 'Tests')?.failures).toHaveLength(1);
+  });
+});

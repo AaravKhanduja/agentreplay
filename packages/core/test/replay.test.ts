@@ -246,3 +246,57 @@ describe('selectReplayEvents — the arc', () => {
     expect(JSON.parse(JSON.stringify(first))).toEqual(first);
   });
 });
+
+describe('selectReplayEvents — ordering', () => {
+  it('puts a failure before the discovery that resolved it in the same turn', () => {
+    // One turn can hold the whole arc: the run failed, the cause turned up, the
+    // fix went in. Ordering that turn by importance prints the fix first, which
+    // reads as though the session solved a problem it had not yet hit.
+    const session = sessionWith([
+      userTurn('webhook signatures are failing in prod'),
+      assistantTurn('Rewriting the verifier to take the raw payload straight through.', [
+        tc.multiEdit('src/webhooks/verify.ts', [{ old_string: 'a', new_string: 'b' }]),
+        tc.bash('pnpm test webhooks', { error: 'Error: no signatures found matching the expected signature' }),
+        tc.bash('pnpm test webhooks', { error: 'Error: no signatures found matching the expected signature' }),
+      ]),
+      assistantTurn(
+        'There it is. src/lib/stripe.ts resolves webhookSecret once at module load, so every HMAC here is computed with an empty secret.',
+        [
+          tc.read('src/lib/stripe.ts'),
+          tc.edit('src/webhooks/verify.ts', 'x', 'y'),
+          tc.bash('pnpm test webhooks'),
+        ],
+        { gapSec: 600 },
+      ),
+      userTurn('ship it', { gapSec: 60 }),
+    ]);
+
+    const kinds = replayOf(session).map((event) => event.kind);
+    const failure = kinds.indexOf('failure');
+    const discovery = kinds.findIndex((kind) => kind === 'discovery' || kind === 'rootCause');
+
+    expect(failure).toBeGreaterThanOrEqual(0);
+    expect(discovery).toBeGreaterThanOrEqual(0);
+    expect(failure).toBeLessThan(discovery);
+  });
+
+  it('never runs backwards in time', () => {
+    const session = sessionWith([
+      userTurn('the build is broken'),
+      assistantTurn('Looking at the config.', [tc.read('tsconfig.json')]),
+      assistantTurn('Fixing the paths.', [
+        tc.edit('tsconfig.json', 'a', 'b'),
+        tc.bash('pnpm typecheck', { error: 'error TS2307: cannot find module' }),
+        tc.bash('pnpm typecheck', { error: 'error TS2307: cannot find module' }),
+      ], { gapSec: 300 }),
+      assistantTurn('The path alias was missing a wildcard. Green now.', [
+        tc.edit('tsconfig.json', 'c', 'd'),
+        tc.bash('pnpm typecheck'),
+      ], { gapSec: 600 }),
+      userTurn('thanks', { gapSec: 60 }),
+    ]);
+
+    const turns = replayOf(session).map((event) => event.turnIndex);
+    expect([...turns].sort((a, b) => a - b)).toEqual(turns);
+  });
+});

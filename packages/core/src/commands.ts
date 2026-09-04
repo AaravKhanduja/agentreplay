@@ -9,7 +9,8 @@
  */
 
 import { checkCategory, checkTitle, commandOf, failureLine, shellKind } from './checks.js';
-import type { CommandGroup, Phase, Session, ToolCall } from './types.js';
+import { errorSignature } from './loops.js';
+import type { CommandFailure, CommandGroup, Phase, Session, ToolCall } from './types.js';
 
 /**
  * A result line's budget. 72 cut real errors mid-word — "(gcloud.sql.instances
@@ -47,24 +48,53 @@ export function summarizeCommands(session: Session, phase: Phase): CommandGroup[
           failed: failed ? 1 : 0,
           lastOutcome: call.outcome,
           note,
-          failNote: failed ? note : null,
+          failures: failed ? [{ signature: signatureOf(note), note, firstTurn: i, count: 1 }] : [],
           turnIndex: i,
           command,
         });
         continue;
       }
       existing.runs += 1;
-      if (failed) existing.failed += 1;
+      if (failed) {
+        existing.failed += 1;
+        recordFailure(existing.failures, note, i);
+      }
       existing.lastOutcome = call.outcome;
       // The last thing it said is the thing worth showing.
       if (note !== null) existing.note = note;
-      if (failed && note !== null) existing.failNote = note;
       existing.turnIndex = i;
       existing.command = command;
     }
   }
 
   return [...groups.values()];
+}
+
+/**
+ * Fold a failing run into the group's failure list, matching on signature.
+ *
+ * Only the count moves once a signature is known: the note and the turn stay on
+ * the first run that failed this way, so a stall reports where it started.
+ */
+function recordFailure(failures: CommandFailure[], note: string | null, turnIndex: number): void {
+  const signature = signatureOf(note);
+  const existing = failures.find((f) => f.signature === signature);
+  if (existing === undefined) {
+    failures.push({ signature, note, firstTurn: turnIndex, count: 1 });
+    return;
+  }
+  existing.count += 1;
+}
+
+/**
+ * `errorSignature` is `loops.ts`'s rule for "these two errors are the same" —
+ * lowercased, with line/column numbers and hex addresses stripped. Reused here
+ * so the two places that group failures never disagree about what counts as a
+ * repeat. Runs that said nothing share the empty signature and pool together,
+ * which is right: "backfill.ts failed ×3" is the whole fact available.
+ */
+function signatureOf(note: string | null): string {
+  return note === null ? '' : errorSignature(note);
 }
 
 /** The action a command performs, and what kind of action it is. */

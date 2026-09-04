@@ -274,15 +274,35 @@ export interface CommandGroup {
   /** First line of what came back — the error, or a line with a count. */
   note: string | null;
   /**
-   * The same line, from the last run that actually failed. A group that failed
-   * and then passed ends green, so `note` describes the pass — reporting the
-   * failure with it says "Tests 12 passed (12)" under a red mark.
+   * Each distinct way this command failed, in the order first seen. A group
+   * that failed and then passed ends green, so `note` describes the pass —
+   * reporting the failure with it says "Tests 12 passed (12)" under a red mark.
+   *
+   * Split by signature rather than pooled, because "the same failure ×5" is a
+   * claim about the error, not the command. Five runs of `pnpm test` that
+   * failed four different ways are four findings, and counting them as one
+   * attaches a count to an error that happened once.
    */
-  failNote: string | null;
+  failures: CommandFailure[];
   /** Last occurrence, so the viewer can show the turn behind it. */
   turnIndex: number;
   /** The last raw command, for the tooltip. */
   command: string;
+}
+
+/** One way a command failed, and how often it failed that way. */
+export interface CommandFailure {
+  /** Normalized first line, so two runs that failed alike group together. */
+  signature: string;
+  /** The line to show, from the *first* run that failed this way. */
+  note: string | null;
+  /**
+   * Turn of the first run that failed this way. A stall is dated from where it
+   * began, not where it ended — otherwise the failure sorts after the discovery
+   * that resolved it.
+   */
+  firstTurn: number;
+  count: number;
 }
 
 // ---- explore trail (ExploreTrail) ----
