@@ -154,12 +154,17 @@ export function shellTarget(command: string, projectPath: string): string | null
 // ---------------------------------------------------------------------------
 
 /**
- * Files Claude Code writes for itself — plan documents, settings, transcripts.
+ * Files an agent writes for itself — plan documents, settings, transcripts.
  * They are not the developer's code, so counting them as "files changed" (and
  * their prose as +68 lines) misreports what a session actually did.
+ *
+ * Every agent's directory, not just the one that produced this session: a
+ * session that edits another agent's config is still not editing the project.
+ * Kept as a plain predicate because the three heuristics that ask have only a
+ * path in hand, and threading a source into them would buy nothing.
  */
 export function isHarnessPath(filePath: string): boolean {
-  return /(^|\/)\.claude(\/|$)/.test(filePath);
+  return /(^|\/)\.(claude|codex)(\/|$)/.test(filePath);
 }
 
 // ---------------------------------------------------------------------------

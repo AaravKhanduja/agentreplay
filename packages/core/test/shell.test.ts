@@ -83,6 +83,7 @@ describe('harness-owned files', () => {
   it('recognizes .claude paths anywhere in the tree', () => {
     expect(isHarnessPath('.claude/plans/ancient-roaming-alpaca.md')).toBe(true);
     expect(isHarnessPath('/Users/dev/code/.claude/settings.json')).toBe(true);
+    expect(isHarnessPath('.codex/config.toml')).toBe(true);
     expect(isHarnessPath('src/claude/helper.ts')).toBe(false);
   });
 

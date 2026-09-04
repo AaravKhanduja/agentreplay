@@ -13,7 +13,8 @@ import { countCrossSessionReads } from './discover.js';
 import { buildFileAccess, buildFileEdges } from './files.js';
 import { buildBrief } from './narrative.js';
 import { enrichWithOllama } from './ollama.js';
-import { parseSessionFile } from './parser.js';
+import { resolveSessionRef } from './discover.js';
+import { sourceOf } from './sources/index.js';
 import { segmentPhases } from './phases.js';
 import { summarizeCommands } from './commands.js';
 import { extractEvents } from './events.js';
@@ -22,10 +23,19 @@ import { buildExploreTrail } from './trail.js';
 import { buildVerifyResult } from './verify.js';
 import { extractPlanRevisions } from './plans.js';
 import { selectReplayEvents } from './replay.js';
-import type { AnalyzedSession, AnalyzeOptions, AnalyzeResult, BriefExtras, Session } from './types.js';
+import type {
+  AnalyzedSession,
+  AnalyzeOptions,
+  AnalyzeResult,
+  BriefExtras,
+  Session,
+  SessionRef,
+} from './types.js';
 
 export * from './types.js';
-export { parseSessionFile, parseSessionJsonl } from './parser.js';
+export { parseSessionFile, parseSessionJsonl } from './sources/claude/parser.js';
+export { SOURCES, availableSources, sourceOf } from './sources/index.js';
+export type { SessionSource } from './sources/types.js';
 export { expandShellWrites } from './shellcalls.js';
 export {
   discoverSessions,
@@ -103,18 +113,31 @@ export function analyzeParsedSession(session: Session): AnalyzedSession {
   return { ...withEvents, replay: selectReplayEvents(withEvents) };
 }
 
+/**
+ * A session file or id, analyzed. Takes a `SessionRef` when the caller already
+ * resolved one (the picker hands back the row it listed), or a raw string to
+ * resolve — a path, or an id searched across every installed agent.
+ */
 export async function analyzeSession(
-  filePath: string,
+  ref: string | SessionRef,
   options: AnalyzeOptions = {},
 ): Promise<AnalyzeResult> {
-  const { session, skippedLines } = await parseSessionFile(filePath);
+  const resolved = typeof ref === 'string' ? await resolveSessionRef(ref) : ref;
+  const source = sourceOf(resolved.agent);
+  const { session, skippedLines } = await source.load(resolved);
   let analyzed = analyzeParsedSession(session);
 
   // Cross-session facts are optional I/O — best-effort, silent on failure.
+  // A source omits the method where the answer isn't cheap to get right, and a
+  // wrong count here would land inside a takeaway's data bar.
   const extras: BriefExtras = {};
   const rereadCandidates = analyzed.files.filter((f) => f.reads >= 2).map((f) => f.path);
-  if (rereadCandidates.length > 0) {
-    extras.crossSessionReads = await countCrossSessionReads(filePath, rereadCandidates, session.id);
+  if (rereadCandidates.length > 0 && source.crossSessionReads !== undefined) {
+    extras.crossSessionReads = await source.crossSessionReads(
+      resolved,
+      rereadCandidates,
+      session.projectPath,
+    );
   }
 
   // The brief sees the full analysis so it can cross-reference phases

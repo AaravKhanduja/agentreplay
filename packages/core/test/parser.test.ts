@@ -2,7 +2,7 @@ import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { describe, expect, it } from 'vitest';
 
-import { parseSessionFile, parseSessionJsonl } from '../src/parser.js';
+import { parseSessionFile, parseSessionJsonl } from '../src/sources/claude/parser.js';
 import type { ToolCall, Turn } from '../src/types.js';
 
 const fixturesDir = fileURLToPath(new URL('./fixtures/', import.meta.url));

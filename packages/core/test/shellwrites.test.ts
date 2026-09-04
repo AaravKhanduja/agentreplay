@@ -179,7 +179,7 @@ describe('a shell edit reaches the heuristics', () => {
     ].join('\n');
 
   it('becomes a write call with a path, ahead of the shell call it came from', async () => {
-    const { parseSessionJsonl } = await import('../src/parser.js');
+    const { parseSessionJsonl } = await import('../src/sources/claude/parser.js');
     const { session: parsed } = parseSessionJsonl(session(), { sessionId: 's' });
     const calls = parsed.turns.flatMap((t) => t.toolCalls);
 
@@ -192,7 +192,7 @@ describe('a shell edit reaches the heuristics', () => {
   });
 
   it('shows up as an edited file and an edit history', async () => {
-    const { parseSessionJsonl } = await import('../src/parser.js');
+    const { parseSessionJsonl } = await import('../src/sources/claude/parser.js');
     const { buildFileAccess } = await import('../src/files.js');
     const { buildEditHistories } = await import('../src/diffs.js');
     const { session: parsed } = parseSessionJsonl(session(), { sessionId: 's' });
@@ -204,7 +204,7 @@ describe('a shell edit reaches the heuristics', () => {
   });
 
   it('is left out of the header tool count — it is our reading, not a call', async () => {
-    const { parseSessionJsonl } = await import('../src/parser.js');
+    const { parseSessionJsonl } = await import('../src/sources/claude/parser.js');
     const { analyzeParsedSession } = await import('../src/index.js');
     const { buildBrief } = await import('../src/narrative.js');
     const { session: parsed } = parseSessionJsonl(session(), { sessionId: 's' });

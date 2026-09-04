@@ -15,6 +15,19 @@
 /** ISO 8601 timestamp string, e.g. "2026-07-25T22:49:34.855Z". */
 export type Iso = string;
 
+/** Which coding agent produced a session. */
+export type AgentId = 'claude' | 'codex';
+
+/**
+ * Addresses a session. A path alone is not enough for every agent — an id has
+ * to be read out of the file for some, and the agent decides how to load it.
+ */
+export interface SessionRef {
+  agent: AgentId;
+  sessionId: string;
+  filePath: string;
+}
+
 // ---------------------------------------------------------------------------
 // Raw layer (JSONL parse)
 // ---------------------------------------------------------------------------
@@ -74,8 +87,10 @@ export interface Turn {
 }
 
 export interface Session {
-  /** Session uuid — the JSONL filename without extension. */
+  /** Session uuid — how the agent identifies it, not necessarily the filename. */
   id: string;
+  /** The agent that produced it. */
+  agent: AgentId;
   /** Absolute project path, from the events' `cwd` or decoded from the directory name. */
   projectPath: string;
   startedAt: Iso;
@@ -96,7 +111,13 @@ export interface ParsedSession {
 export interface SessionMeta {
   filePath: string;
   sessionId: string;
+  agent: AgentId;
   projectPath: string;
+  /**
+   * The name the agent gave the session, when it keeps one. Null for agents
+   * that don't — Claude Code has no such thing, so a title is derived instead.
+   */
+  title: string | null;
   messageCount: number;
   durationMs: number | null;
   mtimeMs: number;

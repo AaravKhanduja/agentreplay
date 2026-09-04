@@ -11,8 +11,8 @@ import { readFile } from 'node:fs/promises';
 import path from 'node:path';
 
 import { decodeProjectDir } from './discover.js';
-import { expandShellWrites } from './shellcalls.js';
-import type { ParsedSession, Session, ToolCall, ToolCategory, Turn } from './types.js';
+import { expandShellWrites } from '../../shellcalls.js';
+import type { ParsedSession, Session, ToolCall, ToolCategory, Turn } from '../../types.js';
 
 const INPUT_STRING_MAX = 4000;
 const ERROR_TEXT_MAX = 500;
@@ -344,6 +344,7 @@ export function parseSessionJsonl(
   const startedAt = firstTimestamp ?? new Date(0).toISOString();
   const session: Session = {
     id: opts.sessionId,
+    agent: 'claude',
     projectPath,
     startedAt,
     endedAt: lastTimestamp ?? startedAt,

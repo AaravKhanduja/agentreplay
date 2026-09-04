@@ -1,0 +1,93 @@
+// Vitest Snapshot v1, https://vitest.dev/guide/snapshot.html
+
+exports[`the Claude replays do not move > clean-execute.jsonl analyzes to the same replay 1`] = `
+{
+  "debugLoops": [],
+  "files": [
+    "src/lib/fetch.ts r1 w1",
+    "src/lib/config.ts r1 w0",
+    "src/lib/retry.ts r0 w1",
+  ],
+  "phases": [
+    "execute 0-3",
+  ],
+  "replay": [
+    "implementation · 2 files changed",
+  ],
+  "skippedLines": 0,
+  "stats": {
+    "added": 4,
+    "filesChanged": 2,
+    "outcome": "unknown",
+    "outcomeCheck": null,
+    "removed": 1,
+    "toolCalls": 4,
+  },
+  "title": "Add a retry helper to the fetch client",
+  "toolCalls": 4,
+  "turns": 4,
+}
+`;
+
+exports[`the Claude replays do not move > debug-loops.jsonl analyzes to the same replay 1`] = `
+{
+  "debugLoops": [
+    4,
+  ],
+  "files": [
+    "src/webhook/handler.ts r0 w4",
+    "src/utils/signature.ts r1 w0",
+  ],
+  "phases": [
+    "debug 0-1",
+  ],
+  "replay": [
+    "failure · signature mismatch in webhook handler",
+    "discovery · read src/utils/signature.ts after 3 identical failures — then the check passed",
+    "implementation · src/webhook/handler.ts (+4 −4)",
+    "verification · Tests 4 passed (4)",
+  ],
+  "skippedLines": 2,
+  "stats": {
+    "added": 4,
+    "filesChanged": 1,
+    "outcome": "passed",
+    "outcomeCheck": "Tests",
+    "removed": 4,
+    "toolCalls": 10,
+  },
+  "title": "The webhook signature test keeps rejecting valid payloads, fix",
+  "toolCalls": 10,
+  "turns": 2,
+}
+`;
+
+exports[`the Claude replays do not move > plan-mode.jsonl analyzes to the same replay 1`] = `
+{
+  "debugLoops": [],
+  "files": [
+    "src/digest/scheduler.ts r0 w1",
+    "src/digest/render.ts r0 w1",
+  ],
+  "phases": [
+    "plan 0-5",
+    "execute 6-7",
+  ],
+  "replay": [
+    "decision · plan drafted — 2 steps",
+    "implementation · 2 files changed (+2 −1)",
+  ],
+  "skippedLines": 0,
+  "stats": {
+    "added": 2,
+    "filesChanged": 2,
+    "outcome": "unknown",
+    "outcomeCheck": null,
+    "removed": 1,
+    "toolCalls": 3,
+  },
+  "title": "Plan out the notification digest feature",
+  "toolCalls": 3,
+  "turns": 8,
+}
+`;

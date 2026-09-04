@@ -11,7 +11,7 @@ import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { Command } from 'commander';
 import { analyzeSession, discoverSessions, resolveSessionRef } from '@agentreplay/core';
-import type { AnalyzeOptions, SessionMeta } from '@agentreplay/core';
+import type { AnalyzeOptions, SessionMeta, SessionRef } from '@agentreplay/core';
 import { generateAndOpen } from './generate.js';
 import { pickSession } from './picker.js';
 
@@ -56,8 +56,8 @@ async function run(sessionRef: string | undefined, flags: CliFlags): Promise<voi
     : (message: string) => console.log(message);
 
   try {
-    const filePath = await resolveSessionFile(sessionRef, flags);
-    const { analyzed, brief, skippedLines, notes } = await analyzeSession(filePath, toAnalyzeOptions(flags));
+    const target = await resolveSession(sessionRef, flags);
+    const { analyzed, brief, skippedLines, notes } = await analyzeSession(target, toAnalyzeOptions(flags));
 
     if (skippedLines > 0) say(`${skippedLines} line${skippedLines === 1 ? '' : 's'} skipped`);
     for (const note of notes) say(note);
@@ -86,8 +86,12 @@ function toAnalyzeOptions(flags: CliFlags): AnalyzeOptions {
   return {};
 }
 
-async function resolveSessionFile(ref: string | undefined, flags: CliFlags): Promise<string> {
-  if (flags.demo) return resolveDemoPath();
+/** Which session to replay, and which agent's reader can load it. */
+async function resolveSession(ref: string | undefined, flags: CliFlags): Promise<SessionRef> {
+  if (flags.demo) {
+    const filePath = await resolveDemoPath();
+    return { agent: 'claude', sessionId: 'demo-session', filePath };
+  }
 
   if (ref) {
     try {
@@ -100,11 +104,15 @@ async function resolveSessionFile(ref: string | undefined, flags: CliFlags): Pro
   const sessions = await listSessions();
   const mostRecent = sessions[0];
   if (!mostRecent) throw new Error(NO_SESSIONS_MESSAGE);
-  if (flags.last) return mostRecent.filePath;
+  if (flags.last) return refOf(mostRecent);
 
   const pool = flags.all ? sessions : sessions.slice(0, 20);
   const picked = await pickSession(pool, { output: flags.json ? process.stderr : undefined });
-  return picked.filePath;
+  return refOf(picked);
+}
+
+function refOf(meta: SessionMeta): SessionRef {
+  return { agent: meta.agent, sessionId: meta.sessionId, filePath: meta.filePath };
 }
 
 async function listSessions(): Promise<SessionMeta[]> {

@@ -173,16 +173,16 @@ describe('discovery against a temp directory tree', () => {
   });
 
   it('resolves a literal file path', async () => {
-    expect(await resolveSessionRef(sessAPath)).toBe(sessAPath);
+    expect(await resolveSessionRef(sessAPath)).toEqual({ agent: 'claude', sessionId: SESS_A, filePath: sessAPath });
   });
 
   it('resolves a full session uuid across projects', async () => {
-    expect(await resolveSessionRef(SESS_A)).toBe(sessAPath);
+    expect((await resolveSessionRef(SESS_A)).filePath).toBe(sessAPath);
   });
 
   it('resolves a unique uuid prefix', async () => {
-    expect(await resolveSessionRef('3f2b')).toBe(sessAPath);
-    expect(await resolveSessionRef('aa11')).toBe(sessBPath);
+    expect((await resolveSessionRef('3f2b')).filePath).toBe(sessAPath);
+    expect((await resolveSessionRef('aa11')).filePath).toBe(sessBPath);
   });
 
   it('rejects an ambiguous prefix with a friendly message', async () => {
@@ -195,7 +195,7 @@ describe('discovery against a temp directory tree', () => {
 
   it('explains when no sessions exist at all', async () => {
     process.env['CLAUDE_CONFIG_DIR'] = path.join(tmpDir, 'nope');
-    await expect(resolveSessionRef('3f2b')).rejects.toThrow(/is Claude Code installed/);
+    await expect(resolveSessionRef('3f2b')).rejects.toThrow(/No session matching|looked in/);
   });
 });
 
