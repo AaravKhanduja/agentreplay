@@ -49,6 +49,10 @@ export const CHIP: Record<EventKind, string> = {
 export default function EventGraph({ analyzed, brief }: { analyzed: AnalyzedSession; brief: Brief }) {
   const moments = [...opening(analyzed, brief), ...analyzed.replay];
   const [selected, setSelected] = useState<number | null>(null);
+  /* Hovering a file lights it up everywhere else it appears. The finding a
+     replay can show that scrollback cannot is that a file was open long
+     before it mattered — so the graph lets you see it rather than say it. */
+  const [litFile, setLitFile] = useState<string | null>(null);
 
   useEffect(() => {
     const onKey = (event: KeyboardEvent) => {
@@ -101,6 +105,8 @@ export default function EventGraph({ analyzed, brief }: { analyzed: AnalyzedSess
                       ? `graph-ev-${anchorByTurn.get(moment.relatesTo)}`
                       : null
                   }
+                  litFile={litFile}
+                  onFile={setLitFile}
                 />
               ))}
             </section>
@@ -129,6 +135,8 @@ function Node({
   onSelect,
   seenAt,
   anchor,
+  litFile,
+  onFile,
 }: {
   event: SessionEvent;
   id: string;
@@ -136,20 +144,25 @@ function Node({
   onSelect: () => void;
   seenAt: string | undefined;
   anchor: string | null;
+  /** The file currently hovered anywhere in the graph, or null. */
+  litFile: string | null;
+  onFile: (file: string | null) => void;
 }) {
   const chip = CHIP[event.kind];
+  const echoes = litFile !== null && event.evidence.includes(litFile);
 
   return (
     <article
       className={`ar-graph-node ar-graph-node--${event.rank} ar-graph-node--k-${event.kind}${selected ? ' is-selected' : ''}`}
       id={id}
+      data-echo={echoes || undefined}
     >
       <span className="ar-graph-time mono">{fmtClock(event.timestamp)}</span>
       <span className="ar-graph-mark" aria-hidden>
         {MARK[event.kind]}
       </span>
 
-      <div className="ar-graph-body" onClick={onSelect} role="presentation">
+      <div className="ar-graph-body">
         {chip !== '' && (
           <span className="ar-graph-chip mono">
             {chip}
@@ -157,13 +170,28 @@ function Node({
           </span>
         )}
 
-        <p className="ar-graph-text">{event.label}</p>
+        <button type="button" className="ar-graph-text" aria-expanded={selected} onClick={onSelect}>
+          <span>{event.label}</span>
+          <span className="ar-graph-cue" aria-hidden>
+            {selected ? 'Hide evidence' : 'Evidence →'}
+          </span>
+        </button>
 
         <p className="ar-graph-support mono">
           {event.evidence.slice(0, 3).map((item, i) => (
-            <span key={i} className="ar-graph-support-item" title={item}>
+            <button
+              key={i}
+              type="button"
+              className="ar-graph-support-item"
+              title={item}
+              data-lit={litFile === item || undefined}
+              onMouseEnter={() => onFile(item)}
+              onMouseLeave={() => onFile(null)}
+              onFocus={() => onFile(item)}
+              onBlur={() => onFile(null)}
+            >
               {tail(item, 2)}
-            </span>
+            </button>
           ))}
           {seenAt !== undefined &&
             (anchor !== null ? (
@@ -179,9 +207,6 @@ function Node({
             ) : (
               <span className="ar-graph-seen">↑ first seen {fmtClock(seenAt)}</span>
             ))}
-          <button className="ar-graph-evd" aria-expanded={selected} onClick={onSelect}>
-            {selected ? 'Hide evidence' : 'Evidence →'}
-          </button>
         </p>
       </div>
     </article>

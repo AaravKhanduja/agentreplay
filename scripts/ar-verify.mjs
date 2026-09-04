@@ -79,17 +79,20 @@ try {
   const firstNodeTop = () =>
     page.$eval('.ar-graph-node:last-of-type', (el) => Math.round(el.getBoundingClientRect().top));
   const before = await firstNodeTop();
-  await page.click('.ar-graph-node .ar-graph-evd');
+  // The statement itself is the control — there is no separate evidence link.
+  await page.click('.ar-graph-node .ar-graph-text');
   await page.waitForSelector('.ar-drawer', { timeout: 5_000 }).catch(() => {});
   await new Promise((r) => setTimeout(r, 300));
   check('evidence opens a drawer', (await count('.ar-drawer')) === 1);
   check('opening evidence does not move the story', Math.abs((await firstNodeTop()) - before) <= 2);
-  check('full turn is collapsed by default', (await count('.ar-drawer-turn')) === 0);
+  // The turn arrives open on purpose: reaching it cost two clicks, and it is
+  // what a reader wants almost every time. Collapsing is the one-click move.
+  check('full turn is open by default', (await count('.ar-drawer-turn')) === 1);
+  check('turn is markdown-rendered', (await count('.ar-drawer-turn .ar-md-para, .ar-drawer-turn .ar-md-code')) > 0);
 
   await page.click('.ar-drawer-turn-toggle');
   await new Promise((r) => setTimeout(r, 200));
-  check('full turn opens on request', (await count('.ar-drawer-turn')) === 1);
-  check('turn is markdown-rendered', (await count('.ar-drawer-turn .ar-md-para, .ar-drawer-turn .ar-md-code')) > 0);
+  check('full turn collapses on request', (await count('.ar-drawer-turn')) === 0);
 
   await page.keyboard.press('Escape');
   await new Promise((r) => setTimeout(r, 200));

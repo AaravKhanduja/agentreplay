@@ -41,6 +41,9 @@
 :root {
   --font-sans: 'IBM Plex Sans', -apple-system, 'Segoe UI', sans-serif;
   --font-mono: 'IBM Plex Mono', ui-monospace, 'SF Mono', Menlo, monospace;
+  /* Display only. Condensed is a register change inside the same family —
+     it gives a milestone presence without importing a second voice. */
+  --font-display: 'IBM Plex Sans Condensed', 'IBM Plex Sans', -apple-system, sans-serif;
   --phase-explore: var(--read-fill);
   --phase-plan: var(--text-muted);
   --phase-execute: var(--edit-fill);
@@ -403,8 +406,8 @@ ol {
 
 .ar-graph {
   position: relative;
-  max-width: 620px;
-  margin-top: 16px;
+  max-width: 720px;
+  margin-top: 20px;
   /* time | connector | content — one compositional unit, not three columns */
   --graph-gutter: 42px;
   --graph-line: calc(var(--graph-gutter) + 14px);
@@ -428,7 +431,7 @@ ol {
   content: '';
   position: absolute;
   left: var(--graph-line);
-  top: 44px;
+  top: 46px;
   bottom: 10px;
   width: 1px;
   background: var(--border-default);
@@ -492,28 +495,28 @@ ol {
 
 .ar-graph-node {
   position: relative;
-  padding: 12px 0 12px var(--graph-indent);
+  padding: 20px 0 20px var(--graph-indent);
 }
 
 .ar-graph-node--key {
-  padding-top: 26px;
-  padding-bottom: 26px;
+  padding-top: 36px;
+  padding-bottom: 36px;
 }
 
 .ar-graph-node--k-rootCause {
-  padding-top: 32px;
-  padding-bottom: 32px;
+  padding-top: 40px;
+  padding-bottom: 40px;
 }
 
 .ar-graph-node--outcome {
-  padding-top: 32px;
-  padding-bottom: 22px;
+  padding-top: 40px;
+  padding-bottom: 28px;
 }
 
 .ar-graph-time {
   position: absolute;
   left: 0;
-  top: 14px;
+  top: 22px;
   width: var(--graph-gutter);
   text-align: right;
   font-size: 10.5px;
@@ -521,22 +524,22 @@ ol {
 }
 
 .ar-graph-node--key .ar-graph-time {
-  top: 28px;
+  top: 40px;
 }
 
 .ar-graph-node--k-rootCause .ar-graph-time {
-  top: 34px;
+  top: 44px;
 }
 
 .ar-graph-node--outcome .ar-graph-time {
-  top: 34px;
+  top: 44px;
 }
 
 /* The mark sits on the connector, on a disc of page background. */
 .ar-graph-mark {
   position: absolute;
   left: var(--graph-line);
-  top: 13px;
+  top: 21px;
   transform: translateX(-50%);
   width: 16px;
   height: 16px;
@@ -551,17 +554,17 @@ ol {
 }
 
 .ar-graph-node--key .ar-graph-mark {
-  top: 27px;
+  top: 39px;
   font-size: 14px;
 }
 
 .ar-graph-node--k-rootCause .ar-graph-mark {
-  top: 33px;
+  top: 43px;
   font-size: 15.5px;
 }
 
 .ar-graph-node--outcome .ar-graph-mark {
-  top: 33px;
+  top: 43px;
   font-size: 14px;
 }
 
@@ -596,8 +599,8 @@ ol {
 /* ---- chip: the semantic verb, so the content stays session-authored ---- */
 
 .ar-graph-chip {
-  display: inline-block;
-  margin-bottom: 6px;
+  display: block;
+  margin-bottom: 9px;
   font-size: 10px;
   font-weight: 500;
   letter-spacing: 0.12em;
@@ -630,30 +633,63 @@ ol {
 
 /* ---- content: session wording, no quotation marks, no speaker label ---- */
 
+/* The statement is what you read, so it is also what you click. A separate
+   control at the end of a metadata row reads as chrome and goes unfound. */
 .ar-graph-text {
-  max-width: 52ch;
-  font-size: 14px;
-  line-height: 1.5;
+  display: block;
+  width: 100%;
+  text-align: left;
+  background: none;
+  border: 0;
+  padding: 0;
+  cursor: pointer;
+  font-family: inherit;
+  max-width: 54ch;
+  font-size: 18px;
+  line-height: 1.55;
   color: var(--text-secondary);
   transition: color 140ms ease;
 }
 
-.ar-graph-node--key .ar-graph-text {
-  max-width: 46ch;
-  font-size: 16.5px;
-  line-height: 1.45;
-  letter-spacing: -0.005em;
+.ar-graph-node--key .ar-graph-text,
+.ar-graph-node--outcome .ar-graph-text {
+  max-width: 30ch;
+  font-family: var(--font-display);
+  font-weight: 600;
+  font-size: 28px;
+  line-height: 1.2;
+  letter-spacing: -0.026em;
   color: var(--text-primary);
 }
 
 .ar-graph-node--k-rootCause .ar-graph-text {
-  font-size: 17.5px;
+  font-size: 31px;
 }
 
-.ar-graph-node--outcome .ar-graph-text {
-  max-width: 46ch;
-  font-size: 16px;
+.ar-graph-text:hover,
+.ar-graph-text:focus-visible {
   color: var(--text-primary);
+}
+
+/* The affordance appears where the eye already is. */
+.ar-graph-cue {
+  display: inline-block;
+  margin-left: 11px;
+  vertical-align: middle;
+  font-family: var(--font-mono);
+  font-size: 11px;
+  letter-spacing: 0.08em;
+  color: var(--selection);
+  white-space: nowrap;
+  opacity: 0;
+  transform: translateX(-4px);
+  transition: opacity 160ms ease, transform 160ms ease;
+}
+
+.ar-graph-text:hover .ar-graph-cue,
+.ar-graph-text:focus-visible .ar-graph-cue {
+  opacity: 1;
+  transform: none;
 }
 
 /* The opening request: quiet, italic, clamped — the header already quotes it. */
@@ -669,16 +705,35 @@ ol {
   display: flex;
   flex-wrap: wrap;
   align-items: baseline;
-  gap: 9px;
-  max-width: 52ch;
-  margin-top: 7px;
+  gap: 10px;
+  max-width: 54ch;
+  margin-top: 11px;
   font-size: 11px;
   color: var(--text-dim);
 }
 
-.ar-graph-support-item + .ar-graph-support-item::before {
-  content: '· ';
-  color: var(--border-strong);
+.ar-graph-support-item {
+  font-family: var(--font-mono);
+  font-size: 11px;
+  color: var(--text-dim);
+  background: none;
+  border: 0;
+  border-bottom: 1px solid transparent;
+  padding: 0 0 1px;
+  cursor: pointer;
+  transition: color 140ms ease, border-color 140ms ease;
+}
+
+/* The cross-reference: one file, lit wherever else the session touched it.
+   A file open long before it mattered is the thing a replay can show that
+   scrollback cannot, so the graph lets you see it rather than assert it. */
+.ar-graph-support-item[data-lit] {
+  color: var(--selection);
+  border-color: var(--selection);
+}
+
+.ar-graph-node[data-echo] .ar-graph-mark {
+  box-shadow: 0 0 0 4px var(--bg-app), 0 0 0 6px rgba(34, 211, 238, 0.4);
 }
 
 .ar-graph-seen {
@@ -694,28 +749,6 @@ button.ar-graph-seen:hover {
 
 /* The affordance, not a control: quiet mono that brightens on hover. The
    event outranks its own button — chrome here made the page a dashboard. */
-.ar-graph-evd {
-  font-size: 10.5px;
-  letter-spacing: 0.05em;
-  color: var(--text-dim);
-  transition: color 140ms ease;
-}
-
-/* `· Evidence →` reads as the last item of the footer it belongs to. */
-.ar-graph-support > * + .ar-graph-evd::before {
-  content: '· ';
-  color: var(--border-strong);
-}
-
-.ar-graph-node:hover .ar-graph-evd,
-.ar-graph-evd:focus-visible {
-  color: var(--text-muted);
-}
-
-.ar-graph-evd:hover {
-  color: var(--selection);
-}
-
 /* ---- selected: subtly brighter, never a card, never dims the rest ---- */
 
 .ar-graph-node.is-selected .ar-graph-text {
@@ -724,10 +757,6 @@ button.ar-graph-seen:hover {
 
 .ar-graph-node.is-selected .ar-graph-mark {
   color: var(--text-primary);
-}
-
-.ar-graph-node.is-selected .ar-graph-evd {
-  color: var(--selection);
 }
 
 /* ==========================================================================
@@ -740,7 +769,7 @@ button.ar-graph-seen:hover {
   right: 0;
   bottom: 0;
   z-index: 80;
-  width: clamp(360px, 30vw, 460px);
+  width: clamp(420px, 36vw, 560px);
   padding: 16px 22px 48px;
   background: var(--bg-panel);
   border-left: 1px solid var(--border-default);
@@ -829,21 +858,22 @@ button.ar-graph-seen:hover {
 
 /* The one surface where quoting is the point: exact transcript treatment. */
 .ar-drawer-quote {
-  font-size: 13.5px;
+  font-size: 16px;
+  line-height: 1.65;
   font-style: italic;
   line-height: 1.55;
   color: var(--text-primary);
 }
 
 .ar-drawer-fact {
-  font-size: 13.5px;
-  line-height: 1.55;
+  font-size: 16px;
+  line-height: 1.65;
   color: var(--text-primary);
 }
 
 .ar-drawer-files {
-  font-size: 12px;
-  line-height: 1.8;
+  font-size: 13px;
+  line-height: 2;
   color: var(--text-muted);
 }
 
@@ -870,7 +900,8 @@ button.ar-graph-seen:hover {
 
 .ar-drawer-turn {
   margin-top: 14px;
-  font-size: 13px;
+  font-size: 15px;
+  line-height: 1.72;
   color: var(--text-secondary);
 }
 
@@ -882,8 +913,8 @@ button.ar-graph-seen:hover {
   margin: 0;
   padding: 0;
   list-style: none;
-  font-size: 11px;
-  line-height: 1.8;
+  font-size: 13px;
+  line-height: 2;
   color: var(--text-muted);
 }
 

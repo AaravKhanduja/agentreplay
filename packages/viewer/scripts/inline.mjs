@@ -111,12 +111,16 @@ function fontDir(pkg) {
 
 const sansDir = fontDir('@fontsource/ibm-plex-sans');
 const monoDir = fontDir('@fontsource/ibm-plex-mono');
+// Condensed is display only — one weight, ~24KB, and it is what gives a
+// milestone its presence without a third type family.
+const condDir = fontDir('@fontsource/ibm-plex-sans-condensed');
 const faces = [
   ['IBM Plex Sans', 400, join(sansDir, 'ibm-plex-sans-latin-400-normal.woff2')],
   ['IBM Plex Sans', 500, join(sansDir, 'ibm-plex-sans-latin-500-normal.woff2')],
   ['IBM Plex Sans', 600, join(sansDir, 'ibm-plex-sans-latin-600-normal.woff2')],
   ['IBM Plex Mono', 400, join(monoDir, 'ibm-plex-mono-latin-400-normal.woff2')],
   ['IBM Plex Mono', 500, join(monoDir, 'ibm-plex-mono-latin-500-normal.woff2')],
+  ['IBM Plex Sans Condensed', 600, join(condDir, 'ibm-plex-sans-condensed-latin-600-normal.woff2')],
 ];
 
 const fontCss = faces
