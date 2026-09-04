@@ -19,11 +19,18 @@ describe('shellKind', () => {
   });
 
   it('does not call mutation or unknown work a read', () => {
-    expect(shellKind("sed -i '' 's/a/b/' src/app.ts")).toBe('other');
-    expect(shellKind('cat template.txt > out.txt')).toBe('other');
+    // A shell edit is now named as one rather than lumped in with the rest:
+    // these used to be 'other', which is why they never reached the file graph.
+    expect(shellKind("sed -i '' 's/a/b/' src/app.ts")).toBe('write');
+    expect(shellKind('cat template.txt > out.txt')).toBe('write');
     expect(shellKind('git commit -m "wip"')).toBe('other');
     expect(shellKind('gcloud sql instances list')).toBe('other');
     expect(shellKind('mkdir -p tmp')).toBe('other');
+  });
+
+  it('never calls a shell edit read-only', () => {
+    expect(isReadOnlyShell("sed -i '' 's/a/b/' src/app.ts")).toBe(false);
+    expect(isReadOnlyShell('cat template.txt > out.txt')).toBe(false);
   });
 
   it('keeps checks separate from reading', () => {

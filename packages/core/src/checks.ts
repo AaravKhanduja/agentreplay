@@ -91,7 +91,7 @@ function firstToken(command: string): string {
  * "bash" made read-only investigation look like execution, so segments of pure
  * searching were classified as write-heavy `execute` phases with zero writes.
  */
-export type ShellKind = 'search' | 'read' | 'check' | 'other';
+export type ShellKind = 'search' | 'read' | 'check' | 'write' | 'other';
 
 const SEARCH_RE = /^(rg|ag|ack|grep|egrep|fgrep|find|fd|glob|locate)\b/;
 const READ_RE = /^(cat|bat|head|tail|less|more|sed|awk|wc|file|stat|ls|tree|pwd|jq|column)\b/;
@@ -110,6 +110,10 @@ export function shellKind(command: string): ShellKind {
     .replace(/\d?>\s*&\s*\d/g, ' ') // 2>&1
     .replace(/\d?>\s*\/dev\/null/g, ' ');
   if (checkCategory(text) !== null) return 'check';
+  // Before MUTATING_RE, which knows only that *something* was written. This
+  // knows what, and to where — and it reads the raw command, because `text` is
+  // lowercased and paths are not.
+  if (collectWrites(command).length > 0) return 'write';
   // Compound commands are classified by their first segment; a pipeline that
   // starts with a search is still a search.
   const head = text.split(/\s*(?:\|\||&&|\||;)\s*/)[0]?.trim() ?? text;
@@ -196,4 +200,296 @@ export function failureLine(text: string | null, maxChars = 72): string | null {
   if (chosen === undefined) return null;
   const shortened = chosen.replace(/(^|[\s"'(])\/[^\s"')]*\/([^\s"'/)]+\/[^\s"')]+)/g, '$1…/$2');
   return shortened.length <= maxChars ? shortened : `${shortened.slice(0, maxChars - 1).trimEnd()}…`;
+}
+
+// ---------------------------------------------------------------------------
+// Writing through the shell
+// ---------------------------------------------------------------------------
+
+/**
+ * One file a shell command writes, with the change itself when the command
+ * carries it literally.
+ *
+ * Agents that have no edit tool do all their editing here — a Codex session is
+ * almost entirely `exec_command` — but Claude Code writes this way too, and
+ * those edits were invisible: no file graph entry, no debug loop, and a header
+ * reading "0 files changed" on a session that rewrote the repo.
+ */
+export interface ShellWrite {
+  /** Project-relative when inside the project. */
+  path: string;
+  mode: 'create' | 'append' | 'patch' | 'inplace';
+  /** The new content, when the command spells it out. Null when it doesn't. */
+  body: string | null;
+  /** Old/new pairs, in the shape `extractDiff` reads. */
+  edits: Array<{ oldText: string; newText: string }>;
+}
+
+/** A heredoc: the command text before `<<`, and the body it carries. */
+interface Heredoc {
+  intro: string;
+  body: string;
+}
+
+/**
+ * Heredocs, in order. The body runs to a line that is exactly the terminator,
+ * which is why this is line-based rather than a regex over the whole command.
+ */
+function heredocs(command: string): { docs: Heredoc[]; rest: string[] } {
+  const lines = command.split('\n');
+  const docs: Heredoc[] = [];
+  const rest: string[] = [];
+
+  for (let i = 0; i < lines.length; i++) {
+    const line = lines[i] ?? '';
+    const start = /<<-?\s*(['"]?)([A-Za-z_][A-Za-z0-9_]*)\1/.exec(line);
+    if (start === null) {
+      rest.push(line);
+      continue;
+    }
+    const terminator = start[2] ?? '';
+    const body: string[] = [];
+    let j = i + 1;
+    for (; j < lines.length; j++) {
+      if ((lines[j] ?? '').trim() === terminator) break;
+      body.push(lines[j] ?? '');
+    }
+    // The whole line minus the marker: `cat <<'EOF' | tee -a log.txt` keeps
+    // both the redirect before it and the pipeline after it.
+    const intro = line.slice(0, start.index) + line.slice(start.index + start[0].length);
+    docs.push({ intro, body: body.join('\n') });
+    i = j; // skip the body and its terminator
+  }
+  return { docs, rest };
+}
+
+/** Strip the quotes a shell path is usually written with. */
+function unquote(token: string): string {
+  const match = /^(['"])(.*)\1$/.exec(token);
+  return match?.[2] ?? token;
+}
+
+/**
+ * The redirect target in a command fragment, and whether it appends.
+ * Stderr plumbing is not a write: `2>&1` and `>/dev/null` are stripped by the
+ * caller, and a bare `>` with no path is ignored.
+ */
+function redirect(intro: string): { path: string; append: boolean } | null {
+  const match = /(>{1,2})\s*(?:"([^"]+)"|'([^']+)'|([^\s|&;<>]+))/.exec(intro);
+  if (match === null) return null;
+  const path = match[2] ?? match[3] ?? match[4] ?? '';
+  if (path === '') return null;
+  return { path, append: match[1] === '>>' };
+}
+
+/** `tee out.txt` / `tee -a out.txt` — the first argument that isn't a flag. */
+function teeTarget(intro: string): { path: string; append: boolean } | null {
+  const match = /(^|[|&;]\s*)tee\s+([^|&;<>]*)/.exec(intro);
+  if (match === null) return null;
+  const args = (match[2] ?? '').trim().split(/\s+/).filter((a) => a !== '');
+  const append = args.some((a) => a === '-a' || a === '--append');
+  const path = args.find((a) => !a.startsWith('-'));
+  return path === undefined ? null : { path: unquote(path), append };
+}
+
+/**
+ * Consecutive `-`/`+` runs in a diff body, paired. A run of deletions followed
+ * by additions is one edit; either alone is a deletion or an insertion.
+ */
+function pairsFromHunk(lines: string[]): Array<{ oldText: string; newText: string }> {
+  const pairs: Array<{ oldText: string; newText: string }> = [];
+  let removed: string[] = [];
+  let added: string[] = [];
+
+  const flush = (): void => {
+    if (removed.length > 0 || added.length > 0) {
+      pairs.push({ oldText: removed.join('\n'), newText: added.join('\n') });
+    }
+    removed = [];
+    added = [];
+  };
+
+  for (const line of lines) {
+    if (line.startsWith('-')) {
+      if (added.length > 0) flush(); // a new run starts
+      removed.push(line.slice(1));
+    } else if (line.startsWith('+')) {
+      added.push(line.slice(1));
+    } else {
+      flush();
+    }
+  }
+  flush();
+  return pairs;
+}
+
+/**
+ * Codex's `apply_patch` envelope: `*** Begin Patch`, then a section per file.
+ * The one write shape where both the path and the change are recoverable.
+ */
+function parseApplyPatch(body: string): ShellWrite[] {
+  const writes: ShellWrite[] = [];
+  let path: string | null = null;
+  let add = false;
+  let hunk: string[] = [];
+
+  const flush = (): void => {
+    if (path === null) return;
+    const edits = add
+      ? [{ oldText: '', newText: hunk.filter((l) => l.startsWith('+')).map((l) => l.slice(1)).join('\n') }]
+      : pairsFromHunk(hunk);
+    if (edits.length > 0) writes.push({ path, mode: 'patch', body: null, edits });
+    path = null;
+    hunk = [];
+  };
+
+  for (const line of body.split('\n')) {
+    const header = /^\*\*\* (Update|Add|Delete) File:\s*(.+?)\s*$/.exec(line);
+    if (header !== null) {
+      flush();
+      // A deletion carries no content, so there is nothing to show as a diff.
+      if (header[1] === 'Delete') continue;
+      path = header[2] ?? null;
+      add = header[1] === 'Add';
+      continue;
+    }
+    if (/^\*\*\* (Begin|End) Patch/.test(line)) {
+      flush();
+      continue;
+    }
+    if (path !== null && !line.startsWith('@@')) hunk.push(line);
+  }
+  flush();
+  return writes;
+}
+
+/** A unified diff, as fed to `git apply` or `patch`. */
+function parseUnifiedDiff(body: string): ShellWrite[] {
+  const writes: ShellWrite[] = [];
+  let path: string | null = null;
+  let hunk: string[] = [];
+
+  const flush = (): void => {
+    if (path === null) return;
+    const edits = pairsFromHunk(hunk);
+    if (edits.length > 0) writes.push({ path, mode: 'patch', body: null, edits });
+    path = null;
+    hunk = [];
+  };
+
+  for (const line of body.split('\n')) {
+    const target = /^\+\+\+ (?:b\/)?(.+?)\s*$/.exec(line);
+    if (target !== null) {
+      flush();
+      const name = target[1] ?? '';
+      path = name === '/dev/null' ? null : name;
+      continue;
+    }
+    if (line.startsWith('--- ') || line.startsWith('diff --git')) continue;
+    if (path !== null && !line.startsWith('@@')) hunk.push(line);
+  }
+  flush();
+  return writes;
+}
+
+/** `sed -i 's/old/new/' file` — BSD's mandatory empty suffix included. */
+function parseSedInPlace(fragment: string): ShellWrite[] {
+  if (!/(^|\s)sed\s/.test(fragment) || !/\s-i\b|--in-place\b/.test(fragment)) return [];
+  const edits: Array<{ oldText: string; newText: string }> = [];
+  for (const match of fragment.matchAll(/s([/|#,])((?:\\.|(?!\1).)*)\1((?:\\.|(?!\1).)*)\1/g)) {
+    edits.push({ oldText: match[2] ?? '', newText: match[3] ?? '' });
+  }
+  // The path is the last bare token: everything after the flags and the script.
+  const tokens = fragment.trim().split(/\s+/).map(unquote);
+  const path = tokens[tokens.length - 1];
+  if (path === undefined || path.startsWith('-') || !/[/.]/.test(path)) return [];
+  return [{ path, mode: 'inplace', body: null, edits }];
+}
+
+/** Commands that spell out the content they write. Anything else is guesswork. */
+const LITERAL_WRITER = /(^|[|&;]\s*)(cat|tee|echo|printf)\b/;
+
+/**
+ * Every file this command writes. `[]` when it writes none — and also when the
+ * command is too unusual to read confidently, because a wrong path in the file
+ * graph is worse than a missing one.
+ *
+ * Deliberately not built on `shellKind`'s preprocessing: that lowercases the
+ * command, and paths and file contents are case-sensitive.
+ */
+export function shellWrites(command: string, projectPath = ''): ShellWrite[] {
+  return collectWrites(command).flatMap((write) => {
+    const path = resolveWritePath(write.path, projectPath);
+    return path === null ? [] : [{ ...write, path }];
+  });
+}
+
+/**
+ * The same reading, before the project filter. `shellKind` needs to know that a
+ * command writes at all, including to a path this project doesn't own.
+ */
+function collectWrites(command: string): ShellWrite[] {
+  // Stderr plumbing is not a write. `>/dev/null` especially: it looks like a
+  // redirect to a path and would otherwise be reported as an edited file.
+  const cleaned = command
+    .replace(/\d?>\s*&\s*\d/g, ' ')
+    .replace(/\d?>>?\s*\/dev\/null/g, ' ');
+
+  const { docs, rest } = heredocs(cleaned);
+  const writes: ShellWrite[] = [];
+
+  for (const doc of docs) {
+    if (/(^|\s)apply_patch\b/.test(doc.intro)) {
+      writes.push(...parseApplyPatch(doc.body));
+      continue;
+    }
+    if (/(^|\s)git\s+apply\b/.test(doc.intro) || /(^|\s)patch\s+-p\d/.test(doc.intro)) {
+      writes.push(...parseUnifiedDiff(doc.body));
+      continue;
+    }
+    // `cat > f <<EOF` and `tee f <<EOF` write the body verbatim. A heredoc fed
+    // to an interpreter (`python3 - <<PY`) writes whatever the script decides,
+    // which is not knowable from here.
+    if (!LITERAL_WRITER.test(doc.intro)) continue;
+    const target = teeTarget(doc.intro) ?? redirect(doc.intro);
+    if (target === null) continue;
+    writes.push({
+      path: unquote(target.path),
+      mode: target.append ? 'append' : 'create',
+      body: doc.body,
+      edits: [{ oldText: '', newText: doc.body }],
+    });
+  }
+
+  for (const fragment of rest.join('\n').split(/[\n;]|&&|\|\|/)) {
+    if (fragment.trim() === '') continue;
+    writes.push(...parseSedInPlace(fragment));
+    if (!LITERAL_WRITER.test(fragment)) continue;
+    const target = teeTarget(fragment) ?? redirect(fragment);
+    if (target === null) continue;
+    // `echo hi > f` and `printf '%s' x > f`: the literal is the new content.
+    const literal = /(?:echo|printf)\s+(.*?)\s*>{1,2}/.exec(fragment);
+    const body = literal === null ? null : unquote((literal[1] ?? '').trim());
+    writes.push({
+      path: unquote(target.path),
+      mode: target.append ? 'append' : 'create',
+      body,
+      edits: body === null ? [] : [{ oldText: '', newText: body }],
+    });
+  }
+
+  return writes;
+}
+
+/**
+ * A write target, project-relative. Null for paths outside the project — a
+ * command that writes to /tmp or to a sibling checkout did not change this
+ * repo, and counting it would inflate "files changed".
+ */
+function resolveWritePath(filePath: string, projectPath: string): string | null {
+  if (filePath === '' || filePath.includes('*')) return null;
+  if (!filePath.startsWith('/')) return filePath.replace(/^\.\//, '');
+  if (projectPath === '') return null;
+  const root = projectPath.endsWith('/') ? projectPath : `${projectPath}/`;
+  return filePath.startsWith(root) ? filePath.slice(root.length) : null;
 }

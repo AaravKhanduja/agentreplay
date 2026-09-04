@@ -34,7 +34,8 @@ export {
   countCrossSessionReads,
 } from './discover.js';
 export { segmentPhases } from './phases.js';
-export { checkCategory, checkLabel, checkTitle, commandOf } from './checks.js';
+export { checkCategory, checkLabel, checkTitle, commandOf, shellKind, shellWrites } from './checks.js';
+export type { ShellKind, ShellWrite } from './checks.js';
 export { buildFileAccess, buildFileEdges } from './files.js';
 export { detectDebugLoops, groupDebugSequences } from './loops.js';
 export { buildEditHistories } from './diffs.js';
