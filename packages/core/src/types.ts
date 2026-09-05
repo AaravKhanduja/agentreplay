@@ -18,6 +18,12 @@ export type Iso = string;
 /** Which coding agent produced a session. */
 export type AgentId = 'claude' | 'codex';
 
+/** How each agent is named to a reader, and where it reads its instructions. */
+export const AGENTS: Record<AgentId, { label: string; speaker: string; memoryFile: string }> = {
+  claude: { label: 'Claude Code', speaker: 'Claude', memoryFile: 'CLAUDE.md' },
+  codex: { label: 'Codex CLI', speaker: 'Codex', memoryFile: 'AGENTS.md' },
+};
+
 /**
  * Addresses a session. A path alone is not enough for every agent — an id has
  * to be read out of the file for some, and the agent decides how to load it.

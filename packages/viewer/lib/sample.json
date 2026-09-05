@@ -2,6 +2,8 @@
   "analyzed": {
     "session": {
       "id": "demo-session",
+      "agent": "claude",
+      "title": null,
       "projectPath": "/Users/dev/code/webhook-service",
       "startedAt": "2026-07-24T14:03:12.000Z",
       "endedAt": "2026-07-24T14:58:09.700000Z",

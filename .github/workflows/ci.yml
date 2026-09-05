@@ -37,8 +37,20 @@ jobs:
       - name: Generate the demo replay
         run: node packages/cli/dist/index.js --demo --no-ollama --out /tmp/demo.html
 
-      - name: Check the artifact is self-contained
+      # The demo is a Claude Code session, so the Codex reader needs its own
+      # end-to-end run: unit tests would not catch a break between the CLI,
+      # the source registry and the generated page.
+      - name: Generate a Codex replay
         run: |
-          test -s /tmp/demo.html
-          # No http(s) references: the page must work offline, forever.
-          ! grep -qE 'src="https?://|href="https?://[^"]*\.css' /tmp/demo.html
+          node packages/cli/dist/index.js \
+            packages/core/test/fixtures/codex-exec.jsonl \
+            --no-ollama --out /tmp/codex.html
+          grep -q '"agent":"codex"' /tmp/codex.html
+
+      - name: Check the artifacts are self-contained
+        run: |
+          for page in /tmp/demo.html /tmp/codex.html; do
+            test -s "$page"
+            # No http(s) references: the page must work offline, forever.
+            ! grep -qE 'src="https?://|href="https?://[^"]*\.css' "$page"
+          done

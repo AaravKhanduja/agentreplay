@@ -1,5 +1,7 @@
 /** Small display formatters shared across components. */
 
+import type { AgentId } from '@agentreplay/core';
+
 /** "14:32" — local time, 24h. */
 export function fmtClock(iso: string): string {
   const d = new Date(iso);
@@ -61,4 +63,15 @@ export function tail(path: string, segments: number): string {
   const parts = path.split('/').filter((part) => part !== '');
   if (parts.length <= segments) return path;
   return parts.slice(-segments).join('/');
+}
+
+/**
+ * Who an assistant turn is attributed to.
+ *
+ * Duplicated from core's AGENTS table on purpose: the viewer imports types
+ * only, never core's runtime — importing it would pull `node:fs` into the
+ * bundle and break the static export.
+ */
+export function speakerOf(agent: AgentId): string {
+  return agent === 'codex' ? 'Codex' : 'Claude';
 }

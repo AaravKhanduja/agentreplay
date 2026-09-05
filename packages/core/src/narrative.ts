@@ -17,6 +17,7 @@ import { planObjective } from './plans.js';
 import { summarizeConclusion } from './summary.js';
 import { deriveTitle } from './title.js';
 import { countChanges } from './verify.js';
+import { AGENTS } from './types.js';
 import type {
   AnalyzedSession,
   Brief,
@@ -792,8 +793,8 @@ function buildTakeaways(analyzed: AnalyzedSession, extras: BriefExtras): Takeawa
   const longWay = longWayAround(analyzed);
   if (longWay !== null) takeaways.push(longWay);
 
-  const claudeMd = claudeMdCandidate(analyzed, extras);
-  if (claudeMd !== null) takeaways.push(claudeMd);
+  const memoryFile = memoryFileCandidate(analyzed, extras);
+  if (memoryFile !== null) takeaways.push(memoryFile);
 
   const reprompt = repromptRoi(analyzed);
   if (reprompt !== null) takeaways.push(reprompt);
@@ -844,7 +845,10 @@ function guessingBeforeReading(analyzed: AnalyzedSession): Takeaway | null {
 }
 
 /** Bar: a file read ≥3× this session, or ≥2× here and ≥2× in sibling sessions. */
-function claudeMdCandidate(analyzed: AnalyzedSession, extras: BriefExtras): Takeaway | null {
+function memoryFileCandidate(analyzed: AnalyzedSession, extras: BriefExtras): Takeaway | null {
+  // Each agent reads its project instructions from its own file, and the advice
+  // is worthless if it names the wrong one.
+  const memoryFile = AGENTS[analyzed.session.agent].memoryFile;
   const cross = extras.crossSessionReads ?? {};
   const candidate = [...analyzed.files]
     .filter((file) => file.reads >= 3 || (file.reads >= 2 && (cross[file.path] ?? 0) >= 2))
@@ -861,8 +865,8 @@ function claudeMdCandidate(analyzed: AnalyzedSession, extras: BriefExtras): Take
   const snippet =
     breakthrough !== undefined
       ? cleanError
-        ? `# CLAUDE.md — read ${candidate.path} before editing; it resolved ${stall.errorName} this session`
-        : `# CLAUDE.md — read ${candidate.path} before editing; this session's debugging fix came from it`
+        ? `# ${memoryFile} — read ${candidate.path} before editing; it resolved ${stall.errorName} this session`
+        : `# ${memoryFile} — read ${candidate.path} before editing; this session's debugging fix came from it`
       : `# ${candidate.path} contains ${inferRole(candidate.path)}`;
 
   const body: NarrativeSpan[] = [
@@ -872,11 +876,11 @@ function claudeMdCandidate(analyzed: AnalyzedSession, extras: BriefExtras): Take
   ];
   const crossCount = cross[candidate.path] ?? 0;
   if (crossCount > 0) body.push(plain(' and '), styled(`${crossCount}×`, 'hl'), plain(' across other sessions in this project'));
-  body.push(plain(' — pinning what it holds into CLAUDE.md saves the re-reads.'));
+  body.push(plain(` — pinning what it holds into ${memoryFile} saves the re-reads.`));
 
   return {
     kind: 'tip',
-    lead: tidy([plain('Pin '), styled(candidate.path, 'file'), plain(' in your CLAUDE.md.')]),
+    lead: tidy([plain('Pin '), styled(candidate.path, 'file'), plain(` in your ${memoryFile}.`)]),
     body: tidy(body),
     snippet,
   };

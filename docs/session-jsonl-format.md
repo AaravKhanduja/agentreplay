@@ -1,5 +1,8 @@
 # Claude Code session JSONL format
 
+> Claude Code's format. Codex CLI rollouts are described in
+> [codex-rollout-format.md](codex-rollout-format.md).
+
 What AgentReplay actually parses. Verified against Claude Code v2.1.x session
 files (`~/.claude/projects/<encoded-project-dir>/<session-uuid>.jsonl`). The
 schema drifts between Claude Code versions — parse defensively, keep the raw

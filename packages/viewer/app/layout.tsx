@@ -13,7 +13,7 @@ import './globals.css';
 
 export const metadata: Metadata = {
   title: 'AgentReplay',
-  description: 'Visual postmortem of a Claude Code session',
+  description: 'Visual postmortem of a coding-agent session',
 };
 
 export default function RootLayout({ children }: { children: React.ReactNode }) {

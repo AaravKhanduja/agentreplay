@@ -2,6 +2,7 @@
 
 import { access } from 'node:fs/promises';
 
+import { AGENTS } from '../../types.js';
 import type { SessionRef } from '../../types.js';
 import type { SessionSource } from '../types.js';
 import {
@@ -15,9 +16,9 @@ import { parseSessionFile } from './parser.js';
 
 export const claudeSource: SessionSource = {
   id: 'claude',
-  label: 'Claude Code',
-  speaker: 'Claude',
-  memoryFile: 'CLAUDE.md',
+  label: AGENTS.claude.label,
+  speaker: AGENTS.claude.speaker,
+  memoryFile: AGENTS.claude.memoryFile,
   root: () => getClaudeProjectsDir(),
   isAvailable: async () => {
     try {

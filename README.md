@@ -4,7 +4,7 @@
 [![CI](https://github.com/AaravKhanduja/agentreplay/actions/workflows/ci.yml/badge.svg)](https://github.com/AaravKhanduja/agentreplay/actions/workflows/ci.yml)
 [![license](https://img.shields.io/npm/l/agentreplay-cli)](LICENSE)
 
-AgentReplay turns Claude Code sessions into visual replays of how the agent worked — what it explored, how its plan changed, what it edited, where it got stuck, and what finally worked.
+AgentReplay turns coding-agent sessions into visual replays of how the agent worked — what it explored, how its plan changed, what it edited, where it got stuck, and what finally worked. It reads **Claude Code** and **OpenAI Codex CLI**.
 
 The output is one self-contained HTML file with one hierarchy: a **header** that names the session, a **ribbon** that maps where the time went, an **event graph** that tells the story in a handful of moments — discovery, root cause, goal changed, decision, implementation, blocked — and an **evidence drawer** that proves every one of them from the transcript. A six-hour session reads in about fifteen seconds, and every claim is one click from the turn that backs it.
 
@@ -15,8 +15,9 @@ The output is one self-contained HTML file with one hierarchy: a **header** that
 Run it without installing:
 
 ```sh
-npx agentreplay-cli          # pick from your 20 most recent Claude Code sessions
-npx agentreplay-cli --demo   # bundled demo session — works without Claude Code
+npx agentreplay-cli          # pick from your 20 most recent sessions, any agent
+npx agentreplay-cli codex    # just your Codex CLI sessions
+npx agentreplay-cli --demo   # bundled demo session — works without either agent
 ```
 
 Or install once, and the command is shorter:
@@ -30,22 +31,26 @@ agentreplay --demo
 > The suffix exists only because npm blocks `agentreplay` as too similar to an
 > unrelated `agent-replay` package.
 
-AgentReplay reads a session file from `~/.claude/projects/`, analyzes it, and opens a single self-contained HTML file in your browser. No server, no install step beyond the CLI itself.
+AgentReplay reads a session file from `~/.claude/projects/` or `~/.codex/sessions/`, analyzes it, and opens a single self-contained HTML file in your browser. No server, no install step beyond the CLI itself.
+
+Both agents get the same replay. Where they differ, the difference is real rather than hidden: Codex has no plan mode, so a Codex replay has no plan phase unless the session used `update_plan`, and because Codex does all its work through the shell, its reads, searches and edits are recognized from the commands themselves.
 
 All flags, written as the installed command — with `npx`, prefix them
 (`npx agentreplay-cli --last`):
 
 | Command | What it does |
 |---|---|
-| `agentreplay` | Picker over the 20 most recent sessions across all projects |
+| `agentreplay` | Picker over the 20 most recent sessions, across all agents and projects |
+| `agentreplay codex` | Scope the picker to one agent (`claude`, `codex`) |
 | `agentreplay --last` | Skip the picker, open the most recent session |
 | `agentreplay --all` | Picker over all sessions |
-| `agentreplay <path-or-uuid>` | Open a specific session (uuid is searched across projects) |
+| `agentreplay <path-or-id>` | Open a specific session; a file is recognized by its contents, an id is searched across agents |
 | `agentreplay --demo` | Open the bundled demo session |
 | `agentreplay --model <name>` | Override the Ollama model (default `llama3.2:3b`) |
 | `agentreplay --no-ollama` | Skip Ollama detection entirely |
 | `agentreplay --out <path>` | Write the HTML to a path instead of tmp (doesn't auto-open) |
 | `agentreplay --json` | Print the analysis as JSON to stdout, no HTML (debug/scripting) |
+| `agentreplay --sources` | List the agents found on this machine, and where they were looked for |
 
 ## Privacy
 
@@ -56,7 +61,7 @@ Everything runs on your machine. Full stop.
 - The only network call AgentReplay can ever make is to an Ollama server on `localhost:11434`, and only if you have one running (skip even the probe with `--no-ollama`).
 - The output is a plain HTML file on your disk. It works from `file://`, offline, forever, and goes nowhere unless you move it — it makes no requests at all, not even a failed one.
 
-Your session data stays exactly where Claude Code put it.
+Your session data stays exactly where your agent put it.
 
 ## The replay
 
@@ -184,6 +189,6 @@ node packages/cli/dist/index.js --demo --no-ollama --json > packages/viewer/lib/
 
 ## Contributing
 
-See [CONTRIBUTING.md](CONTRIBUTING.md) for the repo tour, how to add a heuristic, and the scope lines. This project is maintained best-effort — PRs welcome, especially heuristic improvements with tests.
+See [CONTRIBUTING.md](CONTRIBUTING.md) for the repo tour, how to add a heuristic, and the scope lines. Session formats are documented in [docs/session-jsonl-format.md](docs/session-jsonl-format.md) and [docs/codex-rollout-format.md](docs/codex-rollout-format.md). This project is maintained best-effort — PRs welcome, especially heuristic improvements with tests.
 
 MIT licensed. See [LICENSE](LICENSE).

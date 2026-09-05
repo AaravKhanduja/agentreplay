@@ -3,7 +3,7 @@
 import { useEffect, useRef, useState } from 'react';
 import type { AnalyzedSession, SessionEvent } from '@agentreplay/core';
 import Markdown from './Markdown';
-import { fmtClock } from '../lib/format';
+import { fmtClock, speakerOf } from '../lib/format';
 import { CHIP, MARK } from './EventGraph';
 
 /**
@@ -31,7 +31,7 @@ export default function EvidenceDrawer({
   onClose: () => void;
 }) {
   const turn = analyzed.session.turns[event.turnIndex];
-  const speaker = turn?.role === 'user' ? 'You' : 'Claude';
+  const speaker = turn?.role === 'user' ? 'You' : speakerOf(analyzed.session.agent);
   // Three levels of compression — graph, evidence, transcript. The transcript
   // is the deepest one and arrives open: reaching it cost two clicks, and it is
   // what you want almost every time the drawer opens. Collapsing is one click,

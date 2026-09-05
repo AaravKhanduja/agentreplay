@@ -2,9 +2,10 @@
   "name": "@agentreplay/core",
   "version": "0.1.0",
   "private": true,
-  "description": "Parser and deterministic heuristics behind AgentReplay: Claude Code session JSONL in, an analyzed session out.",
+  "description": "Parser and deterministic heuristics behind AgentReplay: a Claude Code or Codex CLI session in, an analyzed session out.",
   "keywords": [
     "claude-code",
+    "codex",
     "session",
     "jsonl",
     "parser",

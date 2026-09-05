@@ -2,6 +2,7 @@
 
 import { access } from 'node:fs/promises';
 
+import { AGENTS } from '../../types.js';
 import type { SessionRef } from '../../types.js';
 import type { SessionSource } from '../types.js';
 import {
@@ -15,9 +16,9 @@ import { parseCodexFile } from './parser.js';
 
 export const codexSource: SessionSource = {
   id: 'codex',
-  label: 'Codex CLI',
-  speaker: 'Codex',
-  memoryFile: 'AGENTS.md',
+  label: AGENTS.codex.label,
+  speaker: AGENTS.codex.speaker,
+  memoryFile: AGENTS.codex.memoryFile,
   root: () => getCodexSessionsDir(),
   isAvailable: async () => {
     try {
