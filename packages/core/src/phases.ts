@@ -13,7 +13,7 @@
  * kind.
  */
 
-import { checkCategory, commandOf, isReadOnlyShell } from './checks.js';
+import { checkCategory, commandOf, isReadOnlyShell, isDelegation, planText } from './checks.js';
 import { loopRuns } from './loops.js';
 import type { DebugLoop, Iso, Phase, PhaseKind, Session, ToolCategory, Turn } from './types.js';
 
@@ -91,9 +91,8 @@ function buildPhase(turns: Turn[], loops: DebugLoop[], start: number, end: numbe
     if (turn.planMode) planSignal = true;
     for (const call of turn.toolCalls) {
       toolMix[call.category] += 1;
-      if (call.name === 'ExitPlanMode') planSignal = true;
-      // A subagent is sent out to look at something — investigation, not work.
-      if (call.name === 'Agent' || call.name === 'Task') delegated += 1;
+      if (planText(call) !== null) planSignal = true;
+      if (isDelegation(call)) delegated += 1;
       if (call.category !== 'bash') continue;
       const command = commandOf(call);
       if (isReadOnlyShell(command)) readOnlyShell += 1;
@@ -224,7 +223,7 @@ function isWorkless(turns: Turn[], phase: Phase): boolean {
   if (read + write + bash > 0) return false;
   for (let i = phase.startIndex; i <= phase.endIndex; i++) {
     for (const call of turns[i]?.toolCalls ?? []) {
-      if (call.name === 'Agent' || call.name === 'Task') return false;
+      if (isDelegation(call)) return false;
     }
   }
   return true;

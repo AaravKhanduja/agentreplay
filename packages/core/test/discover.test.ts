@@ -12,10 +12,15 @@ import {
 } from '../src/discover.js';
 
 const ORIGINAL_CONFIG_DIR = process.env['CLAUDE_CONFIG_DIR'];
+// Discovery fans out across every installed agent, so a test that only
+// redirects Claude would pick up whatever else is on the machine running it.
+const ORIGINAL_CODEX_HOME = process.env['CODEX_HOME'];
 
 afterEach(() => {
   if (ORIGINAL_CONFIG_DIR === undefined) delete process.env['CLAUDE_CONFIG_DIR'];
   else process.env['CLAUDE_CONFIG_DIR'] = ORIGINAL_CONFIG_DIR;
+  if (ORIGINAL_CODEX_HOME === undefined) delete process.env['CODEX_HOME'];
+  else process.env['CODEX_HOME'] = ORIGINAL_CODEX_HOME;
 });
 
 describe('decodeProjectDir', () => {
@@ -75,6 +80,7 @@ describe('discovery against a temp directory tree', () => {
   beforeEach(async () => {
     tmpDir = await mkdtemp(path.join(os.tmpdir(), 'agentreplay-test-'));
     process.env['CLAUDE_CONFIG_DIR'] = tmpDir;
+  process.env['CODEX_HOME'] = path.join(tmpDir, 'no-codex-here');
 
     sessAPath = await writeSession(
       '-Users-dev-code-webshop',

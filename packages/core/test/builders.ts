@@ -88,6 +88,8 @@ export function sessionWith(turns: Turn[], overrides: Partial<Session> = {}): Se
   const lastCall = last?.toolCalls[last.toolCalls.length - 1];
   return {
     id: 'test-session',
+    agent: 'claude',
+    title: null,
     projectPath: '/project',
     startedAt: first?.timestamp ?? iso(0),
     endedAt: lastCall?.timestamp ?? last?.timestamp ?? iso(0),

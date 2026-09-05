@@ -33,6 +33,11 @@ const FILLER = [
 const OPAQUE_ID = /\b(?=[\w-]*\d)(?=[\w-]*[a-z])[\w-]{8,}\b/gi;
 
 export function deriveTitle(session: Session): string {
+  // The agent's own name for the thread beats anything derived from the first
+  // message: it was written knowing how the session went, and it is the
+  // session's wording rather than ours.
+  if (typeof session.title === 'string' && session.title.trim() !== '') return session.title.trim();
+
   const first = session.turns.find((turn) => turn.role === 'user');
   const cleaned = first === undefined ? '' : cleanBody(first.text);
   const sentence = dropOpaqueIds(firstSentence(cleaned));

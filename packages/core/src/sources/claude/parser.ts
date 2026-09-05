@@ -345,6 +345,7 @@ export function parseSessionJsonl(
   const session: Session = {
     id: opts.sessionId,
     agent: 'claude',
+    title: null,
     projectPath,
     startedAt,
     endedAt: lastTimestamp ?? startedAt,

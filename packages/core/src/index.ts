@@ -34,6 +34,7 @@ import type {
 
 export * from './types.js';
 export { parseSessionFile, parseSessionJsonl } from './sources/claude/parser.js';
+export { parseCodexFile, parseCodexJsonl } from './sources/codex/parser.js';
 export { SOURCES, availableSources, sourceOf } from './sources/index.js';
 export type { SessionSource } from './sources/types.js';
 export { expandShellWrites } from './shellcalls.js';
@@ -45,7 +46,16 @@ export {
   countCrossSessionReads,
 } from './discover.js';
 export { segmentPhases } from './phases.js';
-export { checkCategory, checkLabel, checkTitle, commandOf, shellKind, shellWrites } from './checks.js';
+export {
+  checkCategory,
+  checkLabel,
+  checkTitle,
+  commandOf,
+  isDelegation,
+  planText,
+  shellKind,
+  shellWrites,
+} from './checks.js';
 export type { ShellKind, ShellWrite } from './checks.js';
 export { buildFileAccess, buildFileEdges } from './files.js';
 export { detectDebugLoops, groupDebugSequences } from './loops.js';

@@ -178,17 +178,20 @@ describe('a shell edit reaches the heuristics', () => {
       }),
     ].join('\n');
 
-  it('becomes a write call with a path, ahead of the shell call it came from', async () => {
+  it('becomes a write call with a path, behind the command it came from', async () => {
     const { parseSessionJsonl } = await import('../src/sources/claude/parser.js');
     const { session: parsed } = parseSessionJsonl(session(), { sessionId: 's' });
     const calls = parsed.turns.flatMap((t) => t.toolCalls);
 
-    expect(calls.map((c) => c.category)).toEqual(['write', 'bash']);
-    expect(calls[0]?.filePath).toBe('src/author.ts');
-    expect(calls[0]?.synthetic).toBe(true);
+    // The command first, then the edit it made: `loops.ts` scans forward from a
+    // write for the next bash call to see whether the fix held, and the editing
+    // command must not be the thing it finds.
+    expect(calls.map((c) => c.category)).toEqual(['bash', 'write']);
+    expect(calls[1]?.filePath).toBe('src/author.ts');
+    expect(calls[1]?.synthetic).toBe(true);
     // The name stays the command that ran; only the meaning is normalized.
-    expect(calls[0]?.name).toBe('cat');
-    expect(calls[1]?.synthetic).toBeUndefined();
+    expect(calls[1]?.name).toBe('cat');
+    expect(calls[0]?.synthetic).toBeUndefined();
   });
 
   it('shows up as an edited file and an edit history', async () => {

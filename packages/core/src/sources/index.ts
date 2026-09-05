@@ -2,11 +2,12 @@
 
 import type { AgentId } from '../types.js';
 import { claudeSource } from './claude/index.js';
+import { codexSource } from './codex/index.js';
 import type { SessionSource } from './types.js';
 
 export type { SessionSource } from './types.js';
 
-export const SOURCES: readonly SessionSource[] = [claudeSource];
+export const SOURCES: readonly SessionSource[] = [claudeSource, codexSource];
 
 export function sourceOf(agent: AgentId): SessionSource {
   const source = SOURCES.find((s) => s.id === agent);

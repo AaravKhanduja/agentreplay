@@ -91,6 +91,11 @@ export interface Session {
   id: string;
   /** The agent that produced it. */
   agent: AgentId;
+  /**
+   * The name the agent gave this session, when it keeps one. Codex names its
+   * threads; Claude Code does not, so a title is derived from the ask instead.
+   */
+  title: string | null;
   /** Absolute project path, from the events' `cwd` or decoded from the directory name. */
   projectPath: string;
   startedAt: Iso;

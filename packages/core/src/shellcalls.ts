@@ -16,13 +16,18 @@ import { shellWrites } from './checks.js';
 import type { ToolCall } from './types.js';
 
 /**
- * A shell call, preceded by one write call per file it edits.
+ * A shell call, followed by one write call per file it edited.
  *
- * The order is the whole point. `loops.ts` finds a write and then scans
- * *forward* for the next bash call to see whether the fix held; a single call
- * that was both write and bash would find itself, and the scan would collapse.
- * Emitting the writes first leaves the shell call sitting where the check that
- * follows an edit normally sits, so every heuristic downstream works unchanged.
+ * The order is the whole point, and it is the opposite of what it first looks
+ * like. `loops.ts` finds a write and scans *forward* for the next bash call to
+ * decide whether the fix held. Put the writes first and the very next bash call
+ * is the editing command itself — `apply_patch` reporting its own success — so
+ * every debug loop closes green on the edit instead of on the test that follows
+ * it, and a session that fought an error for an hour shows no failing loops.
+ * Emitting them after leaves the real check as the next bash call, which is
+ * exactly the shape `loops.ts` was written for.
+ *
+ * The timestamps are identical either way, so nothing else can tell.
  */
 export function expandShellWrites(call: ToolCall, projectPath: string): ToolCall[] {
   const command = typeof call.input['command'] === 'string' ? call.input['command'] : '';
@@ -49,7 +54,9 @@ export function expandShellWrites(call: ToolCall, projectPath: string): ToolCall
     synthetic: true,
   }));
 
-  return [...synthetic, call];
+  // The command itself goes back to being a command: the synthetic calls are
+  // the edit now, and leaving it a write would count the same change twice.
+  return [{ ...call, category: 'bash' as const }, ...synthetic];
 }
 
 /** One pair is an Edit; several are a MultiEdit. Both shapes already decode. */

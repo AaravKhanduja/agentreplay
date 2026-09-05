@@ -71,6 +71,27 @@ export function checkTitle(command: string): string {
   return category === null ? firstToken(command) : (LONG_LABEL[category] ?? firstToken(command));
 }
 
+/**
+ * The plan a call filed, or null when it filed none.
+ *
+ * Read by shape rather than by tool name: one agent submits a plan document
+ * when it leaves plan mode, another files a list of steps mid-run, and both
+ * arrive here as a `plan` string because their parsers put one there.
+ */
+export function planText(call: ToolCall): string | null {
+  const plan = call.input['plan'];
+  return typeof plan === 'string' && plan.trim() !== '' ? plan.trim() : null;
+}
+
+/**
+ * A call that sent a subagent out to look at something — investigation, not
+ * work. Named tools, because there is no shape that distinguishes delegation,
+ * and every agent's name for it belongs in one list rather than in `phases.ts`.
+ */
+export function isDelegation(call: ToolCall): boolean {
+  return call.name === 'Agent' || call.name === 'Task';
+}
+
 export function commandOf(call: ToolCall): string {
   const command = call.input['command'];
   return typeof command === 'string' ? command : call.name;

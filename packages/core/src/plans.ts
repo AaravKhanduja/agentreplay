@@ -7,6 +7,8 @@
  */
 
 import { createPatch } from 'diff';
+import { planText } from './checks.js';
+
 import type { PlanRevision, PlanStep, Session, Turn } from './types.js';
 
 const EXPANDED_GROWTH = 1.4; // a paragraph that grew >40% is 'expanded'
@@ -49,12 +51,11 @@ export function extractPlanRevisions(session: Session): PlanRevision[] {
 
 function planTextOf(turn: Turn): string | null {
   if (turn.role !== 'assistant') return null;
-  // ExitPlanMode's `plan` input is the authoritative full plan; a turn's prose
-  // usually restates it, so joining the two would duplicate the document.
+  // A filed plan is the authoritative one; a turn's prose usually restates it,
+  // so joining the two would duplicate the document.
   for (const call of turn.toolCalls) {
-    if (call.name !== 'ExitPlanMode') continue;
-    const plan = call.input['plan'];
-    if (typeof plan === 'string' && plan.trim() !== '') return plan.trim();
+    const plan = planText(call);
+    if (plan !== null) return plan;
   }
   if (turn.planMode && turn.text.trim() !== '') return turn.text.trim();
   return null;
