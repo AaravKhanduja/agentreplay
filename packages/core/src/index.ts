@@ -40,6 +40,7 @@ export type { SessionSource } from './sources/types.js';
 export { expandShellWrites } from './shellcalls.js';
 export {
   discoverSessions,
+  noSessionsMessage,
   resolveSessionRef,
   getClaudeProjectsDir,
   decodeProjectDir,

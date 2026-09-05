@@ -2,6 +2,14 @@
  * Interactive session picker.
  *
  * Rows look like:  ~/code/webshop            ·   34 msgs ·     45m · 2h ago
+ *
+ * With more than one agent installed a leading agent column appears, because
+ * two rows for the same project are otherwise indistinguishable:
+ *
+ *   codex    ~/code/webshop            ·   88 msgs ·  1h 12m · 5h ago
+ *
+ * It stays hidden while only one agent is installed: nothing about the flow
+ * should announce a capability to someone who cannot use it.
  */
 
 import os from 'node:os';
@@ -17,9 +25,11 @@ export async function pickSession(
 ): Promise<SessionMeta> {
   const projects = sessions.map((session) => truncateLeft(shortenHome(session.projectPath), MAX_PROJECT_WIDTH));
   const projectWidth = Math.max(...projects.map((p) => p.length));
+  const agents = new Set(sessions.map((session) => session.agent));
+  const agentWidth = agents.size > 1 ? Math.max(...[...agents].map((a) => a.length)) : 0;
 
   const choices = sessions.map((session, i) => ({
-    name: formatRow(projects[i] ?? '', projectWidth, session),
+    name: formatRow(projects[i] ?? '', projectWidth, session, agentWidth),
     value: session,
   }));
 
@@ -35,11 +45,18 @@ export async function pickSession(
   );
 }
 
-function formatRow(project: string, projectWidth: number, session: SessionMeta): string {
+function formatRow(
+  project: string,
+  projectWidth: number,
+  session: SessionMeta,
+  agentWidth: number,
+): string {
   const msgs = `${String(session.messageCount).padStart(4)} msgs`;
   const duration = humanDuration(session.durationMs).padStart(7);
   const age = humanAge(session.mtimeMs);
-  return `${project.padEnd(projectWidth)} · ${msgs} · ${duration} · ${age}`;
+  // The agent qualifies the row; the project is still its subject.
+  const agent = agentWidth === 0 ? '' : `${session.agent.padEnd(agentWidth)}  `;
+  return `${agent}${project.padEnd(projectWidth)} · ${msgs} · ${duration} · ${age}`;
 }
 
 /** /Users/you/code/webshop → ~/code/webshop */
