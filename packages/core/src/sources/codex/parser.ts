@@ -17,7 +17,7 @@ import { readFile } from 'node:fs/promises';
 import path from 'node:path';
 
 import { shellKind } from '../../checks.js';
-import { expandShellWrites } from '../../shellcalls.js';
+import { expandPatchWrites, expandShellWrites } from '../../shellcalls.js';
 import type { ParsedSession, Session, ToolCall, ToolCategory, Turn } from '../../types.js';
 
 const INPUT_STRING_MAX = 4000;
@@ -25,6 +25,12 @@ const ERROR_TEXT_MAX = 500;
 const RESULT_PREVIEW_MAX = 300;
 /** Silence between two tool calls that ends an assistant turn. */
 const IDLE_SPLIT_MS = 10 * 60_000;
+/**
+ * The developer refused the patch, so it never applied. Neither a success nor a
+ * failure — the same rule the Claude reader applies to a declined tool call, and
+ * for the same reason: a row of refusals is not a row of bugs.
+ */
+const DECLINED_RE = /(rejected by user|aborted by the user|user rejected|user denied)/i;
 
 function isRecord(value: unknown): value is Record<string, unknown> {
   return typeof value === 'object' && value !== null && !Array.isArray(value);
@@ -138,6 +144,11 @@ export function parseCodexJsonl(
   let currentAssistant: Turn | null = null;
   const pendingCalls = new Map<string, ToolCall>();
   const shellCalls: ToolCall[] = [];
+  /** Patch calls, with the untruncated document each one filed. */
+  const patchText = new Map<ToolCall, string>();
+  const patchById = new Map<string, ToolCall>();
+  /** Calls whose result `patch_apply_end` already reported, in more detail. */
+  const settled = new Set<ToolCall>();
   let firstTimestamp: string | null = null;
   let lastTimestamp: string | null = null;
 
@@ -205,6 +216,24 @@ export function parseCodexJsonl(
         turn.text = turn.text === '' ? text : `${turn.text}\n\n${text}`;
         continue;
       }
+      if (payloadType === 'patch_apply_end') {
+        // The authoritative result of a patch: which files, and whether it took.
+        const call = patchById.get(str(payload['call_id']) ?? '');
+        if (call === undefined) continue;
+        const stderr = str(payload['stderr']) ?? '';
+        call.outcome =
+          payload['success'] === true ? 'success' : DECLINED_RE.test(stderr) ? 'unknown' : 'error';
+        if (call.outcome === 'error') call.errorText = stderr.slice(0, ERROR_TEXT_MAX);
+        call.resultPreview = (str(payload['stdout']) ?? stderr).slice(0, RESULT_PREVIEW_MAX);
+        settled.add(call);
+        continue;
+      }
+      if (payloadType === 'turn_aborted') {
+        // The developer stopped the agent mid-run. Whatever happens next is a
+        // new stretch of work, and phases are cut at turn boundaries.
+        currentAssistant = null;
+        continue;
+      }
       if (payloadType === 'token_count') {
         const info = isRecord(payload['info']) ? payload['info'] : null;
         const usage = info !== null && isRecord(info['total_token_usage']) ? info['total_token_usage'] : null;
@@ -251,21 +280,71 @@ export function parseCodexJsonl(
       continue;
     }
 
-    if (payloadType === 'function_call_output') {
+    if (payloadType === 'custom_tool_call') {
+      // Not JSON arguments: the whole input is the patch document itself.
+      const name = str(payload['name']) ?? 'unknown';
+      const callId = str(payload['call_id']) ?? '';
+      const patch = str(payload['input']) ?? '';
+      const call: ToolCall = {
+        id: callId,
+        name,
+        // The write is the per-file call this expands into, not the call itself.
+        category: 'meta',
+        timestamp,
+        durationMs: null,
+        input: { patch: truncateStrings(patch) as string },
+        filePath: null,
+        outcome: 'unknown',
+        errorText: null,
+        resultPreview: null,
+      };
+      openAssistant(timestamp).toolCalls.push(call);
+      if (callId !== '') {
+        pendingCalls.set(callId, call);
+        patchById.set(callId, call);
+      }
+      patchText.set(call, patch);
+      continue;
+    }
+
+    if (payloadType === 'web_search_call') {
+      const action = isRecord(payload['action']) ? payload['action'] : {};
+      const query = str(action['query']);
+      const url = str(action['url']);
+      openAssistant(timestamp).toolCalls.push({
+        id: str(payload['id']) ?? '',
+        name: 'web_search',
+        // Reading is reading whatever tool carried it.
+        category: 'read',
+        timestamp,
+        durationMs: null,
+        input: query !== null ? { query } : url !== null ? { url } : {},
+        filePath: null,
+        outcome: str(payload['status']) === 'completed' ? 'success' : 'unknown',
+        errorText: null,
+        resultPreview: null,
+      });
+      continue;
+    }
+
+    if (payloadType === 'function_call_output' || payloadType === 'custom_tool_call_output') {
       const callId = str(payload['call_id']) ?? '';
       const call = pendingCalls.get(callId);
       if (call === undefined) continue;
       pendingCalls.delete(callId);
+
+      const callMs = Date.parse(call.timestamp);
+      const resultMs = Date.parse(timestamp);
+      if (!Number.isNaN(callMs) && !Number.isNaN(resultMs)) call.durationMs = resultMs - callMs;
+
+      // A patch reported its own result already, and said more than this line does.
+      if (settled.has(call)) continue;
 
       const rawOutput = str(payload['output']) ?? outputText(payload['output']);
       const { exitCode, body } = readOutput(rawOutput);
       call.outcome = outcomeOf(exitCode, call);
       if (call.outcome === 'error') call.errorText = body.slice(0, ERROR_TEXT_MAX);
       call.resultPreview = body.slice(0, RESULT_PREVIEW_MAX);
-
-      const callMs = Date.parse(call.timestamp);
-      const resultMs = Date.parse(timestamp);
-      if (!Number.isNaN(callMs) && !Number.isNaN(resultMs)) call.durationMs = resultMs - callMs;
       continue;
     }
   }
@@ -276,7 +355,17 @@ export function parseCodexJsonl(
     const command = str(call.input['command']) ?? '';
     if (call.category === 'read') call.filePath = shellReadTarget(command, projectPath);
   }
-  expandInPlace(turns, shellCalls, projectPath);
+
+  const expansions = new Map<ToolCall, ToolCall[]>();
+  for (const call of shellCalls) {
+    const expanded = expandShellWrites(call, projectPath);
+    if (expanded.length > 1) expansions.set(call, expanded);
+  }
+  for (const [call, patch] of patchText) {
+    const expanded = expandPatchWrites(call, patch, projectPath);
+    if (expanded.length > 1) expansions.set(call, expanded);
+  }
+  applyExpansions(turns, expansions);
 
   const startedAt = firstTimestamp ?? new Date(0).toISOString();
   const session: Session = {
@@ -335,13 +424,8 @@ function outcomeOf(exitCode: number | null, call: ToolCall): ToolCall['outcome']
   return 'error';
 }
 
-/** Replace each shell call with the writes it made, followed by itself. */
-function expandInPlace(turns: Turn[], shellCalls: ToolCall[], projectPath: string): void {
-  const expansions = new Map<ToolCall, ToolCall[]>();
-  for (const call of shellCalls) {
-    const expanded = expandShellWrites(call, projectPath);
-    if (expanded.length > 1) expansions.set(call, expanded);
-  }
+/** Swap each call that edited files for itself followed by one write per file. */
+function applyExpansions(turns: Turn[], expansions: Map<ToolCall, ToolCall[]>): void {
   if (expansions.size === 0) return;
   for (const turn of turns) {
     if (turn.toolCalls.some((call) => expansions.has(call))) {

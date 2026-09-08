@@ -444,7 +444,25 @@ const LITERAL_WRITER = /(^|[|&;]\s*)(cat|tee|echo|printf)\b/;
  * command, and paths and file contents are case-sensitive.
  */
 export function shellWrites(command: string, projectPath = ''): ShellWrite[] {
-  return collectWrites(command).flatMap((write) => {
+  return resolveWrites(collectWrites(command), projectPath);
+}
+
+/**
+ * The writes a patch document makes, project-relative.
+ *
+ * The `*** Begin Patch` format reaches this repo two ways: a heredoc piped to
+ * `apply_patch` in the shell, and an agent whose own patch tool files the same
+ * text as the call's argument. Same format, so it gets one parser rather than
+ * one per source — the reader that has a patch in hand calls this instead of
+ * dressing it up as a shell command first.
+ */
+export function applyPatchWrites(patch: string, projectPath = ''): ShellWrite[] {
+  return resolveWrites(parseApplyPatch(patch), projectPath);
+}
+
+/** Drop the writes that land outside the project; make the rest relative. */
+function resolveWrites(writes: ShellWrite[], projectPath: string): ShellWrite[] {
+  return writes.flatMap((write) => {
     const path = resolveWritePath(write.path, projectPath);
     return path === null ? [] : [{ ...write, path }];
   });
@@ -513,7 +531,12 @@ function collectWrites(command: string): ShellWrite[] {
  * repo, and counting it would inflate "files changed".
  */
 function resolveWritePath(filePath: string, projectPath: string): string | null {
-  if (filePath === '' || filePath.includes('*')) return null;
+  // A path that is still a shell variable is a path this reader cannot resolve.
+  // `tmpfile=$(mktemp); cat > "$tmpfile" <<EOF` — a PR body on its way to
+  // `gh pr create` — was landing in the file graph as a file literally named
+  // `$tmpfile`, and in the drawer as a tool named `tmpfile=$(mktemp)`. Whatever
+  // it expanded to, it was not a file in this project.
+  if (filePath === '' || filePath.includes('*') || filePath.includes('$')) return null;
   if (!filePath.startsWith('/')) return filePath.replace(/^\.\//, '');
   if (projectPath === '') return null;
   const root = projectPath.endsWith('/') ? projectPath : `${projectPath}/`;

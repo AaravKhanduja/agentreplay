@@ -7,7 +7,7 @@ import { commandOf, planText } from '../src/checks.js';
 import { analyzeParsedSession } from '../src/index.js';
 import { errorSignature } from '../src/loops.js';
 import { buildBrief } from '../src/narrative.js';
-import { parseCodexFile, readOutput, sessionIdFromPath } from '../src/sources/codex/parser.js';
+import { parseCodexFile, parseCodexJsonl, readOutput, sessionIdFromPath } from '../src/sources/codex/parser.js';
 import { sniffCodex } from '../src/sources/codex/discover.js';
 import type { Session, ToolCall } from '../src/types.js';
 
@@ -166,14 +166,100 @@ describe('codex discovery', () => {
   });
 });
 
+describe('codex patches', () => {
+  const patchCalls = (session: Session): ToolCall[] =>
+    calls(session).filter((call) => call.name === 'apply_patch');
+
+  it('reads apply_patch as one write per file it changed', async () => {
+    const { session } = await load('codex-patch.jsonl');
+    const writes = patchCalls(session).filter((call) => call.category === 'write');
+    expect(writes.map((call) => call.filePath)).toEqual([
+      'src/webhooks/verify.ts',
+      'src/webhooks/raw-body.ts',
+      'src/config/env.ts',
+    ]);
+  });
+
+  it('files the edits where diffs.ts can read them', async () => {
+    const { session } = await load('codex-patch.jsonl');
+    const analyzed = analyzeParsedSession(session);
+    // Without this the whole chain is empty: no file graph, no edit history,
+    // and no debug loop, because a loop begins at a write with a path.
+    expect(analyzed.files.filter((file) => file.writes > 0)).toHaveLength(3);
+    const verify = analyzed.editHistories.find((h) => h.path === 'src/webhooks/verify.ts');
+    expect(verify?.attempts).toHaveLength(1);
+    expect(verify?.attempts[0]?.diff.some((line) => line.kind === 'del')).toBe(true);
+    expect(verify?.attempts[0]?.diff.some((line) => line.kind === 'add')).toBe(true);
+  });
+
+  it('counts one action even when the patch changed two files', async () => {
+    const { session } = await load('codex-patch.jsonl');
+    const applied = patchCalls(session).filter((call) => call.id.startsWith('p1'));
+    // The agent made one call; two files changed. The parent is what the header
+    // counts, the synthetic writes are what the file graph reads.
+    expect(applied.filter((call) => call.synthetic !== true)).toHaveLength(1);
+    expect(applied.filter((call) => call.synthetic === true)).toHaveLength(2);
+    expect(applied[0]?.category).toBe('meta');
+  });
+
+  it('treats a patch the developer refused as unknown, never an error', async () => {
+    const { session } = await load('codex-patch.jsonl');
+    const refused = patchCalls(session).filter((call) => call.id.startsWith('p2'));
+    expect(refused.length).toBeGreaterThan(0);
+    // "patch rejected by user" never applied, so it is neither a pass nor a
+    // fail — counting it as a failure turns a row of refusals into a row of bugs.
+    expect(refused.every((call) => call.outcome === 'unknown')).toBe(true);
+    expect(refused.every((call) => call.errorText === null)).toBe(true);
+  });
+
+  it('names every file even when the patch is longer than the input cap', () => {
+    const files = Array.from({ length: 6 }, (_, i) => `src/gen/file-${i}.ts`);
+    const patch = [
+      '*** Begin Patch',
+      ...files.flatMap((file) => [`*** Add File: ${file}`, `+// ${'x'.repeat(900)}`]),
+      '*** End Patch',
+    ].join('\n');
+    expect(patch.length).toBeGreaterThan(4000);
+
+    const jsonl = [
+      JSON.stringify({ timestamp: '2026-06-02T10:00:00.000Z', type: 'session_meta', payload: { id: 's', cwd: '/repo' } }),
+      JSON.stringify({ timestamp: '2026-06-02T10:00:01.000Z', type: 'response_item', payload: { type: 'custom_tool_call', call_id: 'p9', name: 'apply_patch', input: patch } }),
+    ].join('\n');
+
+    const { session } = parseCodexJsonl(jsonl, { sessionId: 's' });
+    // The stored input is truncated to keep the artifact small; the parse is not.
+    expect(calls(session).filter((c) => c.category === 'write').map((c) => c.filePath)).toEqual(files);
+    expect(String(calls(session)[0]?.input['patch']).length).toBeLessThan(patch.length);
+  });
+});
+
+describe('codex turns', () => {
+  it('ends the turn where the developer stopped the run', async () => {
+    const { session } = await load('codex-patch.jsonl');
+    // turn_aborted is a seam: what the agent says afterwards is a new stretch
+    // of work, and phases are cut at turn boundaries.
+    const assistant = session.turns.filter((turn) => turn.role === 'assistant');
+    expect(assistant.length).toBeGreaterThan(1);
+    expect(assistant.at(-1)?.text).toContain('Stopped.');
+    expect(assistant[0]?.text).not.toContain('Stopped.');
+  });
+
+  it('reads a web search as reading', async () => {
+    const { session } = await load('codex-patch.jsonl');
+    const search = calls(session).find((call) => call.name === 'web_search');
+    expect(search?.category).toBe('read');
+    expect(search?.input['query']).toContain('raw body');
+  });
+});
+
 describe('the codex analysis is artifact-safe', () => {
-  it.each(['codex-exec.jsonl', 'codex-plan.jsonl'])('%s survives the JSON round trip', async (name) => {
+  it.each(['codex-exec.jsonl', 'codex-plan.jsonl', 'codex-patch.jsonl'])('%s survives the JSON round trip', async (name) => {
     const { session } = await load(name);
     const analyzed = analyzeParsedSession(session);
     expect(JSON.parse(JSON.stringify(analyzed))).toEqual(analyzed);
   });
 
-  it.each(['codex-exec.jsonl', 'codex-plan.jsonl'])('%s analyzes the same way twice', async (name) => {
+  it.each(['codex-exec.jsonl', 'codex-plan.jsonl', 'codex-patch.jsonl'])('%s analyzes the same way twice', async (name) => {
     const { session } = await load(name);
     expect(buildBrief(analyzeParsedSession(session))).toEqual(buildBrief(analyzeParsedSession(session)));
   });
