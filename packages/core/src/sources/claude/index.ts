@@ -8,6 +8,7 @@ import type { SessionSource } from '../types.js';
 import {
   countCrossSessionReads,
   discoverClaudeSessions,
+  countClaudeFiles,
   getClaudeProjectsDir,
   resolveClaudeRef,
   sniffClaude,
@@ -29,6 +30,7 @@ export const claudeSource: SessionSource = {
     }
   },
   discover: (opts) => discoverClaudeSessions(opts),
+  countFiles: () => countClaudeFiles(),
   resolve: (ref) => resolveClaudeRef(ref),
   sniff: sniffClaude,
   load: (ref: SessionRef) => parseSessionFile(ref.filePath),

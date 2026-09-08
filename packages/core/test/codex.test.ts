@@ -188,6 +188,62 @@ describe('codex message shapes', () => {
   });
 });
 
+describe('codex format drift', () => {
+  const rollout = (payloads: Record<string, unknown>[]): string =>
+    [
+      JSON.stringify({
+        timestamp: '2027-01-01T09:00:00.000Z',
+        type: 'session_meta',
+        payload: { id: 'drift', cwd: '/Users/dev/reports' },
+      }),
+      ...payloads.map((payload, i) =>
+        JSON.stringify({
+          timestamp: `2027-01-01T09:00:0${i + 1}.000Z`,
+          type: 'event_msg',
+          payload,
+        }),
+      ),
+    ].join('\n');
+
+  it('reports nothing for shapes it knows', async () => {
+    for (const name of ['codex-items.jsonl', 'codex-exec.jsonl', 'codex-patch.jsonl']) {
+      const { unknownEvents } = await load(name);
+      expect(unknownEvents, name).toEqual({});
+    }
+  });
+
+  it('counts a payload kind it has no name for', () => {
+    const { unknownEvents } = parseCodexJsonl(
+      rollout([{ type: 'item_finished', item: { type: 'UserMessage', content: [] } }]),
+      { sessionId: 'drift' },
+    );
+    expect(unknownEvents).toEqual({ 'event_msg/item_finished': 1 });
+  });
+
+  it('counts an item kind it has no name for, naming the item', () => {
+    const { unknownEvents } = parseCodexJsonl(
+      rollout([
+        { type: 'item_completed', item: { type: 'ModelTurn', content: [{ type: 'Text', text: 'hi' }] } },
+        { type: 'item_completed', item: { type: 'ModelTurn', content: [{ type: 'Text', text: 'again' }] } },
+      ]),
+      { sessionId: 'drift' },
+    );
+    // Named down to the item, because that is the level the last change moved.
+    expect(unknownEvents).toEqual({ 'event_msg/item_completed/ModelTurn': 2 });
+  });
+
+  it('stays quiet about kinds it ignores on purpose', () => {
+    const { unknownEvents } = parseCodexJsonl(
+      rollout([
+        { type: 'item_completed', item: { type: 'FileChange', status: 'completed', changes: {} } },
+        { type: 'task_complete', turn_id: 't1' },
+      ]),
+      { sessionId: 'drift' },
+    );
+    expect(unknownEvents).toEqual({});
+  });
+});
+
 describe('codex discovery', () => {
   it('recognizes a rollout by its first line', () => {
     expect(sniffCodex('{"timestamp":"2026-05-28T14:00:00Z","type":"session_meta","payload":{}}')).toBe(true);

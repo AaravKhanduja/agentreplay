@@ -135,7 +135,7 @@ export async function analyzeSession(
 ): Promise<AnalyzeResult> {
   const resolved = typeof ref === 'string' ? await resolveSessionRef(ref) : ref;
   const source = sourceOf(resolved.agent);
-  const { session, skippedLines } = await source.load(resolved);
+  const { session, skippedLines, unknownEvents } = await source.load(resolved);
   let analyzed = analyzeParsedSession(session);
 
   // Cross-session facts are optional I/O — best-effort, silent on failure.
@@ -163,5 +163,5 @@ export async function analyzeSession(
     if (enriched.note) notes.push(enriched.note);
   }
 
-  return { analyzed, brief, skippedLines, notes };
+  return { analyzed, brief, skippedLines, unknownEvents, notes };
 }

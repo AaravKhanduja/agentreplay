@@ -11,6 +11,7 @@ import {
   getClaudeProjectsDir,
   resolveSessionRef,
 } from '../src/discover.js';
+import { codexSource } from '../src/sources/codex/index.js';
 import { sessionIdFromPath } from '../src/sources/codex/parser.js';
 
 const ORIGINAL_CONFIG_DIR = process.env['CLAUDE_CONFIG_DIR'];
@@ -239,6 +240,17 @@ describe('codex discovery against a rollout tree', () => {
     expect(metas).toHaveLength(1);
     expect(metas[0]?.agent).toBe('codex');
     expect(metas[0]?.projectPath).toBe('/Users/dev/reports');
+  });
+
+  it('counts the files it could not read, so none-readable is distinguishable from none', async () => {
+    // A file that is not a rollout at all: found by countFiles, dropped by discover.
+    await writeFile(
+      path.join(codexHome, 'sessions', '2026', '09', '04', 'rollout-2026-09-04T10-00-00-junk.jsonl'),
+      '{"type":"something-else"}\n',
+      'utf8',
+    );
+    expect(await codexSource.countFiles()).toBe(2);
+    expect(await discoverSessions()).toHaveLength(1);
   });
 
   it('counts every message in it, both sides', async () => {

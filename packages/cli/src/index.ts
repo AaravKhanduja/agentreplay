@@ -87,9 +87,13 @@ async function run(sessionRef: string | undefined, flags: CliFlags): Promise<voi
     }
 
     const target = await resolveSession(sessionRef, flags);
-    const { analyzed, brief, skippedLines, notes } = await analyzeSession(target, toAnalyzeOptions(flags));
+    const { analyzed, brief, skippedLines, unknownEvents, notes } = await analyzeSession(
+      target,
+      toAnalyzeOptions(flags),
+    );
 
     if (skippedLines > 0) say(`${skippedLines} line${skippedLines === 1 ? '' : 's'} skipped`);
+    for (const line of describeUnknownEvents(unknownEvents)) say(line);
     for (const note of notes) say(note);
 
     if (flags.json) {
@@ -160,6 +164,28 @@ async function listSessions(scope: AgentId | null): Promise<SessionMeta[]> {
   return [...scoped].sort((a, b) => b.mtimeMs - a.mtimeMs);
 }
 
+/**
+ * Says which shapes the reader had no name for, loudest first.
+ *
+ * Worth a line of its own because the alternative is what happened once
+ * already: the agent changed what it writes, the reader quietly understood
+ * less of every session, and nothing said so.
+ */
+function describeUnknownEvents(unknown: Record<string, number> | undefined): string[] {
+  if (unknown === undefined) return [];
+  const shapes = Object.entries(unknown).sort((a, b) => b[1] - a[1]);
+  if (shapes.length === 0) return [];
+  const total = shapes.reduce((sum, [, count]) => sum + count, 0);
+  const named = shapes.slice(0, 3).map(([shape, count]) => `${shape} ×${count}`);
+  const rest = shapes.length - named.length;
+  return [
+    `${total} event${total === 1 ? '' : 's'} of a kind this version does not read: ` +
+      named.join(', ') +
+      (rest > 0 ? `, and ${rest} more` : ''),
+    'The session format may have changed — some of the replay may be missing.',
+  ];
+}
+
 /** What `--sources` prints: every agent, whether it is here, and how many. */
 async function describeSources(): Promise<string> {
   const available = new Set((await availableSources()).map((source) => source.id));
@@ -168,12 +194,33 @@ async function describeSources(): Promise<string> {
     counts.set(meta.agent, (counts.get(meta.agent) ?? 0) + 1);
   }
   const width = Math.max(...SOURCES.map((source) => source.label.length));
-  return SOURCES.map((source) => {
-    const found = available.has(source.id)
-      ? `${counts.get(source.id) ?? 0} sessions`
-      : 'not found';
-    return `${source.label.padEnd(width)}  ${found.padEnd(13)} ${source.root()}`;
-  }).join('\n');
+  const lines: string[] = [];
+
+  for (const source of SOURCES) {
+    if (!available.has(source.id)) {
+      lines.push(`${source.label.padEnd(width)}  ${'not found'.padEnd(20)} ${source.root()}`);
+      continue;
+    }
+    const read = counts.get(source.id) ?? 0;
+    const files = await source.countFiles();
+    // Three different facts, printed differently, because they used to print
+    // the same: none here, some unreadable, and none readable at all — the
+    // last being a format change, not an empty directory.
+    const found =
+      files === read
+        ? `${read} sessions`
+        : read === 0
+          ? `0 of ${files} files read`
+          : `${read} sessions · ${files - read} unread`;
+    lines.push(`${source.label.padEnd(width)}  ${found.padEnd(20)} ${source.root()}`);
+    if (read === 0 && files > 0) {
+      lines.push(
+        `${' '.repeat(width)}  ⚠ found files but understood none — the session format may have changed`,
+      );
+    }
+  }
+
+  return lines.join('\n');
 }
 
 /**

@@ -166,6 +166,11 @@ async function scanBody(filePath: string): Promise<{ messageCount: number; durat
   return { messageCount, durationMs: firstMs !== null && lastMs !== null ? lastMs - firstMs : null };
 }
 
+/** How many files even look like rollouts — the denominator for "0 readable". */
+export async function countCodexRollouts(): Promise<number> {
+  return (await listRollouts(getCodexSessionsDir())).length;
+}
+
 export async function discoverCodexSessions(opts: { limit?: number } = {}): Promise<SessionMeta[]> {
   const titles = await readTitles();
   const files = await listRollouts(getCodexSessionsDir());

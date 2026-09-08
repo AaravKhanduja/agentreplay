@@ -110,6 +110,16 @@ async function listJsonlFiles(dirPath: string): Promise<string[]> {
   }
 }
 
+/** How many session files exist, read or not — the denominator for "0 readable". */
+export async function countClaudeFiles(): Promise<number> {
+  const projectsDir = getClaudeProjectsDir();
+  let total = 0;
+  for (const dirName of await listProjectDirs(projectsDir)) {
+    total += (await listJsonlFiles(path.join(projectsDir, dirName))).length;
+  }
+  return total;
+}
+
 export async function discoverClaudeSessions(opts: { limit?: number } = {}): Promise<SessionMeta[]> {
   const projectsDir = getClaudeProjectsDir();
   const metas: SessionMeta[] = [];

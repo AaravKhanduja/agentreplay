@@ -25,6 +25,14 @@ export interface SessionSource {
   isAvailable(): Promise<boolean>;
   discover(opts: { limit?: number }): Promise<SessionMeta[]>;
   /**
+   * Files that look like this agent's sessions, whether or not they read.
+   *
+   * `discover` returns only what it understood, so on its own it cannot tell
+   * "you have no sessions" from "I rejected all of them" — and those printed
+   * identically as `0 sessions` while a format change hid behind it.
+   */
+  countFiles(): Promise<number>;
+  /**
    * Every session of this agent's that the reference matches. The dispatcher
    * decides what none and what several mean, so that an id shared by two
    * agents and a prefix shared by two sessions read the same way.

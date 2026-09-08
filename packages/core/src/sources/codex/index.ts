@@ -7,6 +7,7 @@ import type { SessionRef } from '../../types.js';
 import type { SessionSource } from '../types.js';
 import {
   discoverCodexSessions,
+  countCodexRollouts,
   getCodexSessionsDir,
   readTitles,
   resolveCodexRef,
@@ -29,6 +30,7 @@ export const codexSource: SessionSource = {
     }
   },
   discover: (opts) => discoverCodexSessions(opts),
+  countFiles: () => countCodexRollouts(),
   resolve: (ref) => resolveCodexRef(ref),
   sniff: sniffCodex,
   load: async (ref: SessionRef) => {

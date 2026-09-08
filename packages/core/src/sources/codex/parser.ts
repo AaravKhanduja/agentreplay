@@ -112,11 +112,77 @@ function renderPlan(args: Record<string, unknown>): string {
   return explanation === null ? lines.join('\n') : `${explanation}\n\n${lines.join('\n')}`;
 }
 
+/**
+ * Everything Codex is known to write, as `type` or `type/payload.type`.
+ *
+ * This is the reader's vocabulary, not its dispatch table: some of these are
+ * read, some are deliberately ignored (the `response_item/message` copies of
+ * the conversation, `reasoning`, turn boundaries the phases derive themselves,
+ * the searches and compaction notices nothing downstream asks about). What
+ * matters is that anything *outside* the set is new since this was written,
+ * and gets counted rather than passing in silence — which is how the move to
+ * `item_completed` went unnoticed while it emptied the picker.
+ */
+const KNOWN_EVENTS: ReadonlySet<string> = new Set([
+  'session_meta',
+  'turn_context',
+  'compacted',
+  'event_msg/item_completed',
+  'event_msg/user_message',
+  'event_msg/agent_message',
+  'event_msg/task_started',
+  'event_msg/task_complete',
+  'event_msg/token_count',
+  'event_msg/patch_apply_begin',
+  'event_msg/patch_apply_end',
+  'event_msg/turn_aborted',
+  'event_msg/error',
+  'response_item/message',
+  'response_item/reasoning',
+  'response_item/function_call',
+  'response_item/function_call_output',
+  'response_item/custom_tool_call',
+  'response_item/custom_tool_call_output',
+  'response_item/web_search_call',
+  'response_item/tool_search_call',
+  'response_item/tool_search_output',
+]);
+
+/**
+ * The `item.type`s inside `item_completed`. The two messages are read; the
+ * rest are ignored because the same fact arrives as a `response_item` the
+ * parser already reads — a FileChange beside its `custom_tool_call`, a Plan
+ * beside its `update_plan`. A kind not listed here is new.
+ */
+const KNOWN_ITEMS: ReadonlySet<string> = new Set([
+  'UserMessage',
+  'AgentMessage',
+  'FileChange',
+  'WebSearch',
+  'McpToolCall',
+  'Plan',
+  'ContextCompaction',
+]);
+
+/** The shape's name in the tally, or null when the reader knows it. */
+function unknownShape(type: string, payload: Record<string, unknown>): string | null {
+  const payloadType = typeof payload['type'] === 'string' ? payload['type'] : null;
+  const shape = payloadType === null ? type : `${type}/${payloadType}`;
+  if (!KNOWN_EVENTS.has(shape)) return shape;
+  if (payloadType !== 'item_completed') return null;
+  const item = isRecord(payload['item']) ? payload['item'] : null;
+  const itemType = item !== null && typeof item['type'] === 'string' ? item['type'] : null;
+  if (itemType === null || KNOWN_ITEMS.has(itemType)) return null;
+  return `${shape}/${itemType}`;
+}
+
 export function parseCodexJsonl(
   jsonl: string,
   opts: { sessionId: string; projectPathHint?: string; title?: string | null },
 ): ParsedSession {
   let skippedLines = 0;
+  /** Shapes this reader has no name for — drift, counted instead of dropped. */
+  const unknownEvents: Record<string, number> = {};
   const events: Record<string, unknown>[] = [];
 
   for (const rawLine of jsonl.split('\n')) {
@@ -180,6 +246,11 @@ export function parseCodexJsonl(
     }
     const payload = isRecord(event['payload']) ? event['payload'] : null;
     if (payload === null) continue;
+
+    if (typeof type === 'string') {
+      const unknown = unknownShape(type, payload);
+      if (unknown !== null) unknownEvents[unknown] = (unknownEvents[unknown] ?? 0) + 1;
+    }
 
     if (type === 'session_meta') {
       projectPath = str(payload['cwd']) ?? projectPath;
@@ -379,7 +450,7 @@ export function parseCodexJsonl(
     model,
     totalTokens,
   };
-  return { session, skippedLines };
+  return { session, skippedLines, unknownEvents };
 }
 
 /** A tool result that arrived as content blocks rather than a plain string. */

@@ -116,6 +116,18 @@ export interface ParsedSession {
   session: Session;
   /** Count of unparseable lines that were skipped (never crash on malformed JSONL). */
   skippedLines: number;
+  /**
+   * `shape → count` for lines the reader parsed but has no name for — the
+   * agent writing something it did not write when the reader was built.
+   *
+   * Distinct from `skippedLines`, which is malformed input: these lines are
+   * perfectly well-formed and simply unrecognized, so nothing else notices
+   * them. Optional because it is only worth reporting where the agent's
+   * vocabulary is small enough that an unknown shape means something; Claude
+   * Code writes a long and constantly changing list of line types that carry
+   * no conversation, so its reader omits this rather than cry wolf.
+   */
+  unknownEvents?: Record<string, number>;
 }
 
 /** Cheap per-file metadata for the session picker — no full parse. */
@@ -638,6 +650,8 @@ export interface AnalyzeResult {
   analyzed: AnalyzedSession;
   brief: Brief;
   skippedLines: number;
+  /** Shapes the reader did not recognize; see `ParsedSession.unknownEvents`. */
+  unknownEvents?: Record<string, number>;
   /** Notes to surface in the CLI (e.g. Ollama fallback reasons). */
   notes: string[];
 }
