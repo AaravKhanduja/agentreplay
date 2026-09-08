@@ -153,6 +153,41 @@ describe('codex plans', () => {
   });
 });
 
+describe('codex message shapes', () => {
+  // Codex moved the kind of a message from the payload down into item.type and
+  // renamed it. Both spellings live in one sessions directory, so both read.
+  it('reads messages filed as item_completed', async () => {
+    const { session } = await load('codex-items.jsonl');
+    expect(session.turns.map((t) => t.role)).toEqual(['user', 'assistant']);
+    expect(session.turns[0]?.text).toContain('the nightly export lands a day early');
+  });
+
+  it('keeps the agent side, whose blocks are typed Text and not text', async () => {
+    const { session } = await load('codex-items.jsonl');
+    // The capitalisation differs between the two sides of the conversation, so
+    // filtering blocks by their type would drop the agent and look half-fixed.
+    expect(session.turns[1]?.text).toContain('the offset is added before toISOString()');
+  });
+
+  it('merges consecutive agent messages into one turn, ignoring a FileChange between them', async () => {
+    const { session } = await load('codex-items.jsonl');
+    const assistant = session.turns[1];
+    expect(assistant?.text).toContain('Dropped the offset before stamping.');
+    expect(assistant?.text).toContain('The export suite passes');
+    expect(session.turns.filter((t) => t.role === 'assistant')).toHaveLength(1);
+  });
+
+  it('still reads the older spelling, unchanged', async () => {
+    const { session } = await load('codex-exec.jsonl');
+    expect(session.turns[0]?.role).toBe('user');
+    expect(session.turns[0]?.text).toContain('the signature check rejects valid webhooks');
+  });
+
+  it('reads the tool calls either way — they were never the part that moved', async () => {
+    expect(calls((await load('codex-items.jsonl')).session)).toHaveLength(2);
+  });
+});
+
 describe('codex discovery', () => {
   it('recognizes a rollout by its first line', () => {
     expect(sniffCodex('{"timestamp":"2026-05-28T14:00:00Z","type":"session_meta","payload":{}}')).toBe(true);

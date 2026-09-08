@@ -14,6 +14,7 @@ import os from 'node:os';
 import path from 'node:path';
 
 import type { SessionMeta, SessionRef } from '../../types.js';
+import { codexMessage } from './messages.js';
 import { sessionIdFromPath } from './parser.js';
 
 export function getCodexHome(): string {
@@ -153,10 +154,11 @@ async function scanBody(filePath: string): Promise<{ messageCount: number; durat
       lastMs = ts;
     }
     const payload = isRecord(parsed['payload']) ? parsed['payload'] : null;
-    const payloadType = payload === null ? null : payload['type'];
     // event_msg only: the response_item copies of the same text are the model's
-    // view of the conversation, preamble and all.
-    if (parsed['type'] === 'event_msg' && (payloadType === 'user_message' || payloadType === 'agent_message')) {
+    // view of the conversation, preamble and all. What counts as a message is
+    // messages.ts's call, not a second copy of the rule here — that copy is
+    // what silently dropped every session when the format moved.
+    if (parsed['type'] === 'event_msg' && payload !== null && codexMessage(payload) !== null) {
       messageCount += 1;
     }
   }

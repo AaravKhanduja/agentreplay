@@ -6,8 +6,9 @@
  *
  * The one rule worth stating up front: **message text comes from `event_msg`,
  * tool calls come from `response_item`.** The two overlap — a user's prompt
- * appears as both an `event_msg/user_message` and a `response_item/message`
- * with role 'user' — but the `response_item` copy also carries the injected
+ * appears as both an `event_msg` message (`messages.ts` knows its two
+ * spellings) and a `response_item/message` with role 'user' — but the
+ * `response_item` copy also carries the injected
  * AGENTS.md preamble and the permissions instructions, which nobody typed.
  * Reading both would double every turn; reading the wrong one would put a
  * system preamble in the replay's title and its opening request.
@@ -19,6 +20,7 @@ import path from 'node:path';
 import { shellKind } from '../../checks.js';
 import { expandPatchWrites, expandShellWrites } from '../../shellcalls.js';
 import type { ParsedSession, Session, ToolCall, ToolCategory, Turn } from '../../types.js';
+import { codexMessage } from './messages.js';
 
 const INPUT_STRING_MAX = 4000;
 const ERROR_TEXT_MAX = 500;
@@ -202,18 +204,16 @@ export function parseCodexJsonl(
     const payloadType = str(payload['type']);
 
     if (type === 'event_msg') {
-      if (payloadType === 'user_message') {
-        const text = str(payload['message']) ?? '';
-        if (text.trim() === '') continue;
-        turns.push({ role: 'user', timestamp, text, toolCalls: [], planMode: false });
-        currentAssistant = null;
-        continue;
-      }
-      if (payloadType === 'agent_message') {
-        const text = str(payload['message']) ?? '';
-        if (text.trim() === '') continue;
-        const turn = openAssistant(timestamp);
-        turn.text = turn.text === '' ? text : `${turn.text}\n\n${text}`;
+      // Both spellings of a message, old and new, resolve in one place.
+      const message = codexMessage(payload);
+      if (message !== null) {
+        if (message.role === 'user') {
+          turns.push({ role: 'user', timestamp, text: message.text, toolCalls: [], planMode: false });
+          currentAssistant = null;
+        } else {
+          const turn = openAssistant(timestamp);
+          turn.text = turn.text === '' ? message.text : `${turn.text}\n\n${message.text}`;
+        }
         continue;
       }
       if (payloadType === 'patch_apply_end') {

@@ -1,4 +1,4 @@
-import { mkdir, mkdtemp, rm, utimes, writeFile } from 'node:fs/promises';
+import { copyFile, mkdir, mkdtemp, rm, utimes, writeFile } from 'node:fs/promises';
 import os from 'node:os';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
@@ -204,6 +204,47 @@ describe('discovery against a temp directory tree', () => {
   it('explains when no sessions exist at all', async () => {
     process.env['CLAUDE_CONFIG_DIR'] = path.join(tmpDir, 'nope');
     await expect(resolveSessionRef('3f2b')).rejects.toThrow(/No session matching|looked in/);
+  });
+});
+
+describe('codex discovery against a rollout tree', () => {
+  // Discovery counts messages before it will show a session, and that counting
+  // is where a format change hides: the parser kept reading tool calls while
+  // every rollout silently stopped being discovered at all.
+  let codexHome: string;
+
+  beforeEach(async () => {
+    codexHome = await mkdtemp(path.join(os.tmpdir(), 'agentreplay-codex-'));
+    process.env['CODEX_HOME'] = codexHome;
+    process.env['CLAUDE_CONFIG_DIR'] = path.join(codexHome, 'no-claude-here');
+    const day = path.join(codexHome, 'sessions', '2026', '09', '04');
+    await mkdir(day, { recursive: true });
+    const fixture = path.join(
+      fileURLToPath(new URL('.', import.meta.url)),
+      'fixtures',
+      'codex-items.jsonl',
+    );
+    await copyFile(
+      fixture,
+      path.join(day, 'rollout-2026-09-04T09-00-00-019f7a21-4c8e-71a2-9f30-5b6c7d8e9f01.jsonl'),
+    );
+  });
+
+  afterEach(async () => {
+    await rm(codexHome, { recursive: true, force: true });
+  });
+
+  it('finds a rollout whose messages use the current shape', async () => {
+    const metas = await discoverSessions();
+    expect(metas).toHaveLength(1);
+    expect(metas[0]?.agent).toBe('codex');
+    expect(metas[0]?.projectPath).toBe('/Users/dev/reports');
+  });
+
+  it('counts every message in it, both sides', async () => {
+    const [meta] = await discoverSessions();
+    // One from the developer, three from the agent.
+    expect(meta?.messageCount).toBe(4);
   });
 });
 
