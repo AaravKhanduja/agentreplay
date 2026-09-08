@@ -1,6 +1,7 @@
 import { mkdir, mkdtemp, rm, utimes, writeFile } from 'node:fs/promises';
 import os from 'node:os';
 import path from 'node:path';
+import { fileURLToPath } from 'node:url';
 import { afterEach, beforeEach, describe, expect, it } from 'vitest';
 
 import {
@@ -10,6 +11,7 @@ import {
   getClaudeProjectsDir,
   resolveSessionRef,
 } from '../src/discover.js';
+import { sessionIdFromPath } from '../src/sources/codex/parser.js';
 
 const ORIGINAL_CONFIG_DIR = process.env['CLAUDE_CONFIG_DIR'];
 // Discovery fans out across every installed agent, so a test that only
@@ -202,6 +204,39 @@ describe('discovery against a temp directory tree', () => {
   it('explains when no sessions exist at all', async () => {
     process.env['CLAUDE_CONFIG_DIR'] = path.join(tmpDir, 'nope');
     await expect(resolveSessionRef('3f2b')).rejects.toThrow(/No session matching|looked in/);
+  });
+});
+
+describe('resolving a path on a machine with neither agent installed', () => {
+  // CI is exactly this machine: it has never run Claude Code or Codex, so
+  // nothing lives under ~/.claude or ~/.codex. Availability gates discovery,
+  // never a file someone handed us by path.
+  beforeEach(() => {
+    process.env['CLAUDE_CONFIG_DIR'] = path.join(os.tmpdir(), 'agentreplay-no-claude-here');
+    process.env['CODEX_HOME'] = path.join(os.tmpdir(), 'agentreplay-no-codex-here');
+  });
+
+  const fixture = (name: string): string =>
+    path.join(fileURLToPath(new URL('.', import.meta.url)), 'fixtures', name);
+
+  it('resolves a Codex rollout', async () => {
+    const filePath = fixture('codex-exec.jsonl');
+    expect(await resolveSessionRef(filePath)).toEqual({
+      agent: 'codex',
+      sessionId: sessionIdFromPath(filePath),
+      filePath,
+    });
+  });
+
+  it('resolves a Claude session', async () => {
+    const filePath = fixture('clean-execute.jsonl');
+    expect((await resolveSessionRef(filePath)).agent).toBe('claude');
+  });
+
+  it('still rejects a file no reader recognises', async () => {
+    await expect(resolveSessionRef(fixture('../builders.ts'))).rejects.toThrow(
+      /doesn't look like a session file/,
+    );
   });
 });
 

@@ -53,8 +53,6 @@ export async function resolveSessionRef(ref: string): Promise<SessionRef> {
     throw new Error('No session given — pass a session file or a session id.');
   }
 
-  const sources = await availableSources();
-
   let isFile = false;
   try {
     isFile = (await stat(trimmed)).isFile();
@@ -64,7 +62,12 @@ export async function resolveSessionRef(ref: string): Promise<SessionRef> {
   if (isFile) {
     const absolute = path.resolve(trimmed);
     const line = await firstLine(absolute);
-    const owner = sources.find((source) => source.sniff(line));
+    // Sniffed against every reader, not just the installed ones: a path handed
+    // to us is not discovery. The file says who wrote it and the reader ships
+    // with the CLI, so whether this machine has ever run that agent is beside
+    // the point — on a fresh box (CI) it never has, and filtering here
+    // rejected a perfectly readable file as unrecognisable.
+    const owner = SOURCES.find((source) => source.sniff(line));
     if (owner === undefined) {
       throw new Error(`${absolute} doesn't look like a session file from any supported agent.`);
     }
@@ -72,6 +75,9 @@ export async function resolveSessionRef(ref: string): Promise<SessionRef> {
     return resolved ?? { agent: owner.id, sessionId: sessionIdOf(absolute), filePath: absolute };
   }
 
+  // An id, on the other hand, has to be searched for — and only the installed
+  // agents have anywhere to search.
+  const sources = await availableSources();
   if (sources.length === 0) throw new Error(noSessionsMessage());
 
   const matches = (await Promise.all(sources.map((source) => source.resolve(trimmed)))).flat();
