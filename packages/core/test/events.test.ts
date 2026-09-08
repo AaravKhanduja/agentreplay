@@ -100,9 +100,10 @@ describe('extractEvents', () => {
 
 describe('a verdict is not a finding', () => {
   it('never promotes "all green, no type errors, no lint findings" to a root cause', () => {
-    // "no X, no Y" is the root-cause marker that exists for "no author tag, no
-    // result". A passing check report satisfies it, and used to become the
-    // loudest thing on the page while the real finding sat unmarked.
+    // A passing check report used to satisfy the `no X, no Y` root-cause marker
+    // and become the loudest thing on the page while the real finding sat
+    // unmarked. That marker is gone; this stays, because the VERDICT guard has
+    // to hold for every marker, not just the one that first broke it.
     const session = sessionWith([
       userTurn('run the full check before I merge'),
       assistantTurn('All green: 84 tests, no type errors, no lint findings. Safe to merge.', [
@@ -116,11 +117,29 @@ describe('a verdict is not a finding', () => {
     expect(pickRootCause(events)).toBeNull();
   });
 
-  it('still reads "no author tag, no result" as the root cause', () => {
+  it('no longer reads "no author tag, no result" as a root cause', () => {
+    // A real root cause, and it is now missed on purpose. The `no X, no Y`
+    // marker that caught it fired 38 times across 24 real sessions and named a
+    // root cause in none of them — any sentence listing two absences matches,
+    // and prose does that constantly. Nothing textual separates this sentence
+    // from "no server, no SSR, no API routes", so there was nothing to narrow.
+    // This is what the deletion costs; the pattern's precision is what it buys.
     const session = sessionWith([
       userTurn('why is the author tag missing'),
       assistantTurn(
         'The author-page query is a plain equality on Article.authorId — no author tag, no result.',
+        [tc.read('src/services/content.ts')],
+      ),
+      userTurn('got it', { gapSec: 120 }),
+    ]);
+    expect(pickRootCause(eventsOf(session))).toBeNull();
+  });
+
+  it('still reads a root cause that says so', () => {
+    const session = sessionWith([
+      userTurn('why is the author tag missing'),
+      assistantTurn(
+        'The root cause is the author-page query: a plain equality on Article.authorId.',
         [tc.read('src/services/content.ts')],
       ),
       userTurn('got it', { gapSec: 120 }),

@@ -48,9 +48,20 @@ const MARKERS: Array<{ kind: EventKind; pattern: RegExp; weight: number }> = [
     weight: 4,
   },
   {
+    /**
+     * No `no .*, no .*` here, though a root cause is sometimes stated that way
+     * ("no author tag, no result"). Measured over 24 real sessions it fired 38
+     * times and named a root cause in none of them: any sentence listing two
+     * absences matches, and prose does that constantly — "no server, no SSR, no
+     * API routes". Two harms, not one. This kind carries the heaviest weight, so
+     * a false hit becomes the loudest thing on the page; and only one event of a
+     * kind survives per turn, so it also took the slot a real root cause later in
+     * the same turn would have claimed. The good and the bad case are textually
+     * identical — two short nouns, one comma — so there is nothing to narrow.
+     */
     kind: 'rootCause',
     pattern:
-      /(?:^|\s)(root cause|explains? the symptom|fully explains|that's why|that is why|which is why|the reason .* is|no .*, no .*)/i,
+      /(?:^|\s)(root cause|explains? the symptom|fully explains|that's why|that is why|which is why|the reason .* is)/i,
     weight: 5,
   },
   {
@@ -78,11 +89,11 @@ const PREAMBLE = /^(let me|let's|i'll|i will|i'm going to|now i|next[,:]|first[,
 /**
  * A sentence that reports how the checks went, not what is wrong with the code.
  *
- * "All green: 84 tests, no type errors, no lint findings." satisfies the root
- * cause marker `no .*, no .*` — the pattern that exists for "no author tag, no
- * result" — and a verify summary was then being promoted to the loudest thing
- * on the page while the actual finding sat unmarked in the debug phase. A
- * verdict is never a finding, wherever it appears.
+ * "All green: 84 tests, no type errors, no lint findings." used to satisfy the
+ * root cause marker, and a verify summary was then promoted to the loudest thing
+ * on the page while the actual finding sat unmarked in the debug phase. The
+ * pattern that let it through is gone, but the rule outlives it: a verdict is
+ * never a finding, wherever it appears and whichever marker matched it.
  */
 const VERDICT =
   /(?:^|\s)(all green|all (?:tests? )?pass(?:ed|ing)?|safe to merge|no type errors|no lint (?:errors|findings|warnings)|\d+ tests? pass)/i;
