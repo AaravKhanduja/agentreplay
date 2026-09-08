@@ -33,8 +33,9 @@ Every line is `{timestamp, type, payload}`. The first line is always
 |---|---|---|
 | `session_meta` | — | `id`, `cwd`, `cli_version`, `model_provider`, `git` |
 | `turn_context` | — | `turn_id`, `cwd`, `model`, `effort`, `approval_policy` |
-| `event_msg` | `user_message` | What the developer typed, in `message` |
-| `event_msg` | `agent_message` | What the agent said, in `message` |
+| `event_msg` | `item_completed` | A finished item — the kind is `item.type`; see trap 5 |
+| `event_msg` | `user_message` | Older spelling: what the developer typed, in `message` |
+| `event_msg` | `agent_message` | Older spelling: what the agent said, in `message` |
 | `event_msg` | `task_started` / `task_complete` | Turn boundaries, with `turn_id` |
 | `event_msg` | `token_count` | `info.total_token_usage`, cumulative |
 | `response_item` | `function_call` | `name`, `call_id`, `arguments` (a JSON string) |
@@ -50,7 +51,7 @@ Every line is `{timestamp, type, payload}`. The first line is always
 `session_meta.model_provider` is `"openai"`, not a model name. The model name
 (`gpt-5.5`) is on `turn_context`.
 
-## Four traps
+## Five traps
 
 **1. Message text comes from `event_msg`, tool calls from `response_item`.**
 
@@ -61,6 +62,9 @@ block, neither of which anyone typed. Reading both doubles every turn; reading
 only the `response_item` copy puts a system preamble into the replay's title,
 its opening request, and every plan's trigger text — the most visible line on
 the page.
+
+A caveat on the first two rows: current Codex versions write neither. Both are
+the old spelling of trap 5.
 
 **2. Edits arrive as `custom_tool_call`, not `function_call`.**
 
@@ -125,6 +129,38 @@ and the header reports "0 files changed" for a session that rewrote the repo.
 An interpreter heredoc (`python3 - <<'PY'`) writes whatever the script decides
 and is deliberately not guessed at. `write_stdin` is input to a running
 process, not a write.
+
+**5. The kind of a message moved, and both spellings are alive.**
+
+Older versions put it on the payload, with the text in `message`:
+
+```json
+{ "type": "event_msg",
+  "payload": { "type": "user_message", "message": "the signature check rejects valid webhooks" } }
+```
+
+Current versions wrap it in `item_completed` and move the kind one level down,
+into `item.type`, spelled differently — with the text in `item.content`, a list
+of blocks rather than a string:
+
+```json
+{ "type": "event_msg",
+  "payload": { "type": "item_completed",
+               "item": { "type": "UserMessage",
+                         "content": [{ "type": "text", "text": "…" }] } } }
+```
+
+`item.type` is `UserMessage`, `AgentMessage` or `FileChange`. The last is a
+patch result, and is ignored: the same edit already arrives as a
+`custom_tool_call` (trap 2), which is where the diff is read from.
+
+Inside `content`, take any block carrying a string `text`. Do **not** filter on
+the block's own `type`: a user's blocks are typed `text` and an agent's `Text`,
+so filtering drops one side of the conversation and looks half-working.
+
+A sessions directory holds both spellings, so both are read —
+`sources/codex/messages.ts` is the only place that decides, because this was
+written down twice before and the copies drifted apart.
 
 ## `update_plan`
 
