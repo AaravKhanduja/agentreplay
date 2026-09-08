@@ -56,7 +56,6 @@ export function selectReplayEvents(analyzed: AnalyzedSession): SessionEvent[] {
  * which reliably printed a fix above the failure it answered.
  */
 const CAUSAL: Record<EventKind, number> = {
-  question: 0,
   blocker: 1,
   failure: 2,
   hypothesis: 3,

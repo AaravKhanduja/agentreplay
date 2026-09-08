@@ -23,7 +23,6 @@ import { durationMs, fmtClock, fmtDuration, tail } from '../lib/format';
  */
 
 export const MARK: Record<EventKind, string> = {
-  question: '○',
   hypothesis: '●',
   discovery: '●',
   rootCause: '◎',
@@ -36,7 +35,6 @@ export const MARK: Record<EventKind, string> = {
 };
 
 export const CHIP: Record<EventKind, string> = {
-  question: '',
   hypothesis: 'hypothesis',
   discovery: 'discovery',
   rootCause: 'root cause',

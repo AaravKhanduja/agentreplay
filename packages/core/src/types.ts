@@ -401,7 +401,6 @@ export interface VerifyResult {
  * from: a diagram can be generated from events, never from `{phase, files}`.
  */
 export type EventKind =
-  | 'question'
   | 'hypothesis'
   | 'discovery'
   | 'rootCause'
