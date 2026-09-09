@@ -56,6 +56,6 @@
     "@types/node": "^20.14.0",
     "tsup": "^8.2.4",
     "tsx": "^4.16.5",
-    "typescript": "^5.5.4"
+    "typescript": "^7.0.2"
   }
 }
