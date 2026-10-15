@@ -30,8 +30,7 @@ button{font:inherit}
 .grid{position:relative;min-width:0;max-width:100%;overflow-x:auto;padding:5px;margin:-5px}
 .grid .cells{position:relative}
 .grid .c{position:absolute;border-radius:2px;opacity:var(--o);transition:transform .15s ease,filter .2s ease,box-shadow .15s ease;animation:pop .75s cubic-bezier(.33,0,.2,1) backwards}
-.grid .cells:hover .c{filter:brightness(.5)}
-.grid .cells .c:hover{filter:none;transform:scale(1.5);box-shadow:0 0 0 1.5px var(--text);z-index:2}
+.grid .cells .c:hover{transform:scale(1.5);box-shadow:0 0 0 1.5px var(--text);z-index:2}
 .tip{position:fixed;z-index:12;pointer-events:none;background:#2b2a27;color:var(--text);font-size:13px;line-height:1;padding:8px 10px;border-radius:4px;white-space:nowrap;transform:translate(-50%,-100%);opacity:0;transition:opacity .12s ease,left .1s ease,top .1s ease}
 .tip.on{opacity:1}
 .streakbox{position:absolute;border:1.5px solid var(--accent);border-radius:5px;pointer-events:none;animation:fade .8s ease 1.3s backwards}
