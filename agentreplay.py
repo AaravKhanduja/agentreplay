@@ -5,7 +5,7 @@ Reads the session JSONL files Claude Code writes under ~/.claude/projects and
 writes two self-contained HTML files: an overview page and a 1200x675 share
 card. Standard library only. Nothing leaves the machine.
 
-    python3 agentreplay.py [--handle @you] [--out-dir .] [--no-open]
+    python3 agentreplay.py [--out-dir .] [--no-open]
 """
 
 import argparse
@@ -654,7 +654,6 @@ def main(argv=None):
         prog="agentreplay",
         description="An overview of how you work with Claude Code, from ~/.claude.",
     )
-    parser.add_argument("--handle", help="your @handle, shown on the share card")
     parser.add_argument(
         "--claude-dir",
         default=os.environ.get("CLAUDE_CONFIG_DIR") or str(Path.home() / ".claude"),
@@ -670,10 +669,6 @@ def main(argv=None):
     tz = resolve_tz(args.tz)
     claude_dir = DEMO_DIR if args.demo else Path(args.claude_dir).expanduser()
     payload = analyze(claude_dir, tz)
-    handle = (args.handle or "").strip()
-    if handle and not handle.startswith("@"):
-        handle = "@" + handle
-    payload["meta"]["handle"] = handle
 
     if args.json:
         print(json.dumps(payload, indent=2))

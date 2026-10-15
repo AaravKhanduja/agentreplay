@@ -10,14 +10,13 @@ One Python file, no dependencies, nothing leaves your machine.
 
 ```sh
 git clone https://github.com/AaravKhanduja/agentreplay
-python3 agentreplay/agentreplay.py --handle @you
+python3 agentreplay/agentreplay.py
 ```
 
 That writes `agentreplay.html` and `agentreplay-card.html` to the current directory and opens the overview. Python 3.9 or newer; nothing to install.
 
 | Flag | What it does |
 |---|---|
-| `--handle @you` | Your handle, shown on the card |
 | `--out-dir DIR` | Where to write the two files (default: current directory) |
 | `--claude-dir DIR` | Where Claude Code keeps its data (default: `$CLAUDE_CONFIG_DIR` or `~/.claude`) |
 | `--tz Area/City` | Time zone for days and hours (default: your local zone) |

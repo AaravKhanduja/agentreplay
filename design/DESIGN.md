@@ -46,7 +46,7 @@ Second person. "You spent 106 hours directing it." Never first person. Never "yo
 
 ## Card layout (1200x675, padding 44/44/40)
 
-1. Header row: 10px accent square + `agentreplay` (left), `@handle · last 12 months` (right). Mono 15px muted.
+1. Header row: 10px accent square + `agentreplay` (left), `last 12 months` (right). Mono 15px muted.
 2. Month label row (margin-top 44) then grid (margin-top 8).
 3. Flexible space.
 4. Headline: `41-day streak` 72px mono accent, with `Jul 3 to Aug 12` 15px mono muted beside it. Fallback when no streak over 7 days: `1,402 sessions` in the same slot.
