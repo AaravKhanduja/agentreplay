@@ -1,19 +1,7 @@
-# dependencies
-node_modules/
+# generated pages
+agentreplay.html
+agentreplay-card.html
 
-# build output
-dist/
-out/
-.next/
-*.tsbuildinfo
-
-# the viewer single-file build artifact lives in the cli package but is built, not committed
-packages/cli/assets/viewer.html
-packages/cli/assets/demo-session.jsonl
-# copied from the repo root at build time so the npm tarball carries them
-packages/cli/README.md
-packages/cli/LICENSE
-
-# misc
+__pycache__/
+*.pyc
 .DS_Store
-*.log
