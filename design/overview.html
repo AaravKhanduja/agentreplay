@@ -1,0 +1,172 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>agentreplay overview</title>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@400;500;600&family=IBM+Plex+Sans:wght@400;500;600&display=swap">
+<style>
+:root{--ground:#141413;--text:#faf9f5;--text2:#d6d1c7;--muted:#9a948a;--faint:#6b665d;--rule:#2b2a27;--track:#1c1f23;--cell:#222120;--bar2:#3d4652;--accent:#d97757;--friction:#7cc4d6;--mono:'IBM Plex Mono',monospace;--sans:'IBM Plex Sans',system-ui,sans-serif}
+*{box-sizing:border-box}
+body{margin:0;background:var(--ground);color:var(--text);font-family:var(--sans)}
+a{color:var(--text2);text-decoration:none}a:hover{color:var(--text)}
+.wrap{max-width:1040px;margin:0 auto;padding:40px 16px 80px;display:flex;flex-direction:column;gap:52px}
+.mono{font-family:var(--mono)}
+.hdr{display:flex;justify-content:space-between;align-items:center;flex-wrap:wrap;gap:12px;font-family:var(--mono);font-size:14px;color:var(--muted)}
+.mark{width:10px;height:10px;background:var(--accent);display:inline-block}
+.ranges{display:flex;border:1px solid #36342f}
+.ranges button{font-family:var(--mono);font-size:13px;padding:8px 14px;min-height:28px;border:0;border-right:1px solid #36342f;cursor:pointer;background:transparent;color:var(--muted)}
+.ranges button.on{background:var(--text);color:var(--ground)}
+.btn{border:1px solid #36342f;padding:8px 14px;color:var(--text);min-height:28px;display:inline-flex;align-items:center}
+.months{position:relative;height:16px;font-family:var(--mono);font-size:12px;color:var(--muted)}
+.months span{position:absolute;top:0}
+.grid{position:relative;max-width:100%;overflow-x:auto;padding:5px;margin:-5px}
+.grid .cells{position:relative}
+.grid .c{position:absolute;border-radius:2px}
+.streakbox{position:absolute;border:1.5px solid var(--accent);border-radius:5px}
+.headline{display:flex;align-items:baseline;gap:18px;flex-wrap:wrap}
+.headline .big{font-family:var(--mono);font-size:64px;line-height:1;font-weight:500;letter-spacing:-0.03em;color:var(--accent)}
+.headline .dates{font-family:var(--mono);font-size:15px;color:var(--muted)}
+.sentence{font-size:20px;color:var(--text2);line-height:1.4;margin-top:12px}
+.sentence b{font-weight:400;color:var(--accent)}
+.strip{display:grid;grid-template-columns:repeat(auto-fit,minmax(140px,1fr));gap:24px 16px;border-top:1px solid var(--rule);border-bottom:1px solid var(--rule);padding:24px 0}
+.stat .n{font-family:var(--mono);font-size:28px;font-weight:500}
+.stat .l{font-size:13px;color:var(--muted);margin-top:4px}
+.tools{font-family:var(--mono);font-size:13px;color:var(--muted);margin-top:-28px}
+.tools b{font-weight:400;color:var(--text)}
+h2{margin:0;font-size:18px;font-weight:600}
+.sec{display:flex;flex-direction:column;gap:18px}
+.sechdr{display:flex;justify-content:space-between;align-items:baseline;flex-wrap:wrap;gap:8px}
+.sechdr span{font-family:var(--mono);font-size:13px;color:var(--muted)}
+.row{display:grid;gap:16px;align-items:center}
+.row .name{font-family:var(--mono);font-size:14px;color:var(--text2);overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.bar{height:14px;background:var(--track)}.bar i{display:block;height:100%}
+.row .v{font-family:var(--mono);font-size:14px;color:var(--text);text-align:right}
+.row .v2{font-family:var(--mono);font-size:14px;color:var(--muted);text-align:right}
+.two{display:grid;grid-template-columns:repeat(auto-fit,minmax(300px,1fr));gap:40px 48px}
+.heat{display:flex;flex-direction:column;gap:4px}
+.heat .r{display:grid;grid-template-columns:36px minmax(0,1fr);gap:8px;align-items:center}
+.heat .d{font-family:var(--mono);font-size:11px;color:var(--muted)}
+.heat .cells{display:grid;grid-template-columns:repeat(24,minmax(0,1fr));gap:2px}
+.heat .cells i{display:block;height:14px;background:var(--accent)}
+.ticks{display:flex;justify-content:space-between;font-family:var(--mono);font-size:11px;color:var(--faint)}
+.note{font-size:14px;color:var(--text2)}
+.list{display:flex;flex-direction:column;border-top:1px solid var(--rule)}
+.list .li{display:grid;gap:16px;align-items:center;padding:14px 0;border-bottom:1px solid var(--rule)}
+.foot{font-family:var(--mono);font-size:12px;color:var(--faint);border-top:1px solid var(--rule);padding-top:20px}
+</style>
+</head>
+<body>
+<div class="wrap" id="app"></div>
+<script>
+// ---- sample data; replace with the stats dict from aggregate.py ----
+const DATA = {
+  handle: "@aaravkhanduja",
+  today: "2026-10-14",
+  usageStart: "2026-03-02",
+  streak: { start: "2026-07-03", end: "2026-08-12", days: 41 },
+  ranges: {
+    all: { label: "All time", span: "Mar 2 to Oct 14, 226 days", sessions: "1,402", sessNote: "since March across 7 projects", agent: "212", you: "106", tokens: "8.3B", active: "318h", lines: "+84.2k", prs: "23" },
+    d90: { label: "90d", span: "Jul 16 to Oct 14", sessions: "871", sessNote: "across 6 projects", agent: "136", you: "68", tokens: "5.1B", active: "204h", lines: "+51.6k", prs: "15" },
+    d30: { label: "30d", span: "Sep 14 to Oct 14", sessions: "318", sessNote: "across 5 projects", agent: "53", you: "26", tokens: "1.9B", active: "79h", lines: "+18.4k", prs: "6" },
+    d7:  { label: "7d", span: "Oct 7 to Oct 14", sessions: "64", sessNote: "across 3 projects", agent: "12", you: "6", tokens: "412M", active: "18h", lines: "+3.9k", prs: "2" }
+  },
+  tools: [["Read","8.1k"],["Bash","5.6k"],["Edit","4.0k"],["Grep","1.9k"]],
+  projects: [["agentreplay","4.5B",612,54],["capstone-analysis","2.0B",290,24],["keyframe-extractor","1.1B",248,14],["phia-mcp","0.4B",141,5],["scratch","0.2B",111,3]],
+  models: [["opus-5-5","61%",100],["sonnet-5-5","36%",59],["haiku-5-5","3%",5]],
+  modelsNote: "Opus took 61% of tokens on 38% of turns. Cache hit rate 91%.",
+  heatNote: "Peak is 11pm on weeknights. 34% of your messages land after 10pm.",
+  mcp: [["github","612","2%",false],["notion","288","14%",true],["playwright","141","6%",false]],
+  prs: [["Oct 13","Session discovery across ~/.claude/projects","aarav/agentreplay","#84"],["Oct 11","Ollama fallback when no API key is set","aarav/agentreplay","#81"],["Oct 9","Export keyframes as a single contact sheet","aarav/keyframe-extractor","#27"],["Oct 7","Dedupe streaming records by message id","aarav/agentreplay","#79"]]
+};
+// -------------------------------------------------------------------
+const DAY = 86400000;
+const d0 = s => { const [y,m,d] = s.split('-').map(Number); return new Date(y, m-1, d); };
+const rnd = i => { const x = Math.sin(i*9301+49297)*233280; return x - Math.floor(x); };
+const OP = [0,0.2,0.38,0.56,0.78,1.0];
+let range = 'all';
+
+function yearGrid(cell, gap){
+  const PITCH = cell+gap, COLS = 53;
+  const today = d0(DATA.today);
+  const start = new Date(today.getTime() - 364*DAY); start.setDate(start.getDate() - ((start.getDay()+6)%7));
+  const total = Math.round((today-start)/DAY)+1;
+  const us = d0(DATA.usageStart), ss = d0(DATA.streak.start), se = d0(DATA.streak.end);
+  let cells = '';
+  for (let i=0;i<COLS*7;i++){
+    if (i>=total) continue;
+    const d = new Date(start.getTime()+i*DAY), col=Math.floor(i/7), row=i%7;
+    let level=0;
+    if (d>=us){ const wd=d.getDay(), we=wd===0||wd===6; if (rnd(i)<(we?0.45:0.82)) level=1+Math.floor(rnd(i+1000)*5); if (d>=ss&&d<=se) level=Math.max(level,2+Math.floor(rnd(i+2000)*4)); }
+    cells += `<div class="c" style="left:${col*PITCH}px;top:${row*PITCH}px;width:${cell}px;height:${cell}px;background:${level?'var(--accent)':'var(--cell)'};opacity:${level?OP[level]:1}"></div>`;
+  }
+  const c0=Math.floor(Math.round((ss-start)/DAY)/7), c1=Math.floor(Math.round((se-start)/DAY)/7);
+  const box = `<div class="streakbox" style="left:${c0*PITCH-4}px;top:-4px;width:${(c1-c0+1)*PITCH-gap+8}px;height:${7*PITCH-gap+8}px"></div>`;
+  const names=['Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec']; let months='', last=-1;
+  for (let i=0;i<total;i++){ const d=new Date(start.getTime()+i*DAY); if (d.getMonth()!==last){ last=d.getMonth(); if (i>0&&i<5) continue; months+=`<span style="left:${Math.floor(i/7)*PITCH}px">${names[last]}</span>`; } }
+  const W=COLS*PITCH-gap, H=7*PITCH-gap;
+  return `<div class="months" style="width:${W}px">${months}</div><div class="grid"><div class="cells" style="width:${W}px;height:${H}px">${cells}${box}</div></div>`;
+}
+
+function heat(){
+  const days=['Mon','Tue','Wed','Thu','Fri','Sat','Sun']; let out='';
+  days.forEach((day,di)=>{ let cells=''; for(let h=0;h<24;h++){ let v=0; const we=di>=5;
+    if(h>=9&&h<=12)v=we?0.15:0.35; if(h>=13&&h<=18)v=we?0.25:0.5; if(h>=19&&h<=21)v=we?0.45:0.7; if(h>=22||h===0)v=we?0.6:1; if(h===1)v=we?0.4:0.6; if(h>=2&&h<=7)v=0.05; if(di===2&&h===23)v=1;
+    cells+=`<i style="opacity:${(0.08+v*0.92).toFixed(2)}"></i>`; }
+    out+=`<div class="r"><span class="d">${day}</span><div class="cells">${cells}</div></div>`; });
+  return out+`<div class="r"><span></span><div class="ticks"><span>12am</span><span>6am</span><span>12pm</span><span>6pm</span><span>11pm</span></div></div>`;
+}
+
+function render(){
+  const cur = DATA.ranges[range];
+  const app = document.getElementById('app');
+  app.innerHTML = `
+  <div class="hdr">
+    <div style="display:flex;align-items:center;gap:12px"><span class="mark"></span><span style="color:var(--text)">agentreplay</span><span>overview</span></div>
+    <div style="display:flex;gap:20px;align-items:center;flex-wrap:wrap">
+      <div class="ranges">${Object.entries(DATA.ranges).map(([k,v])=>`<button class="${k===range?'on':''}" data-r="${k}">${v.label}</button>`).join('')}</div>
+      <a class="btn" href="card.html">Export card</a>
+    </div>
+  </div>
+  <div style="display:flex;flex-direction:column;gap:8px">${yearGrid(17,2)}</div>
+  <div style="margin-top:-16px">
+    <div class="headline"><div class="big">${DATA.streak.days}-day streak</div><div class="dates">${fmt(DATA.streak.start)} to ${fmt(DATA.streak.end)}</div></div>
+    <div class="sentence">${cur.sessions} sessions ${cur.sessNote}. Claude worked <b>${cur.agent} hours</b>. You spent <b>${cur.you}</b> directing it.</div>
+  </div>
+  <div class="strip">
+    ${stat(cur.sessions,'sessions')}${stat(cur.tokens,'tokens, 91% cache reads')}${stat(cur.active,'active hours, idle gaps removed')}${stat(cur.lines,'lines written')}${stat(cur.prs,'PRs opened')}
+  </div>
+  <div class="tools">Most used tools: ${DATA.tools.map(([n,c])=>`<b>${n}</b> ${c}`).join(' · ')}</div>
+  <div class="sec">
+    <div class="sechdr"><h2>Where the tokens went</h2><span>by project · sessions</span></div>
+    <div style="display:flex;flex-direction:column;gap:14px">${DATA.projects.map(([n,t,s,p],i)=>`<div class="row" style="grid-template-columns:180px minmax(0,1fr) 64px 64px"><span class="name">${n}</span><div class="bar"><i style="width:${p}%;background:${i===0?'var(--accent)':'var(--bar2)'}"></i></div><span class="v">${t}</span><span class="v2">${s}</span></div>`).join('')}</div>
+  </div>
+  <div class="two">
+    <div class="sec">
+      <div class="sechdr"><h2>Models you ran</h2><span>share of tokens</span></div>
+      <div style="display:flex;flex-direction:column;gap:12px">${DATA.models.map(([n,p,w],i)=>`<div class="row" style="grid-template-columns:150px minmax(0,1fr) 48px"><span class="name" style="font-size:13px">${n}</span><div class="bar"><i style="width:${w}%;background:${i===0?'var(--accent)':'var(--bar2)'}"></i></div><span class="v" style="font-size:13px">${p}</span></div>`).join('')}</div>
+      <div class="note">${DATA.modelsNote}</div>
+    </div>
+    <div class="sec">
+      <div class="sechdr"><h2>When you work</h2><span>local time</span></div>
+      <div class="heat">${heat()}</div>
+      <div class="note">${DATA.heatNote}</div>
+    </div>
+  </div>
+  ${DATA.mcp.length?`<div class="sec">
+    <div class="sechdr"><h2>Top MCP servers</h2><span>calls · error rate</span></div>
+    <div class="list">${DATA.mcp.map(([n,c,e,hi])=>`<div class="li" style="grid-template-columns:minmax(0,1fr) 72px 56px;padding:12px 0"><span class="name">${n}</span><span class="v">${c}</span><span class="v" style="color:${hi?'var(--friction)':'var(--muted)'}">${e}</span></div>`).join('')}</div>
+  </div>`:''}
+  <div class="sec">
+    <div class="sechdr"><h2>PRs you opened</h2><span>from gh pr create · ${cur.prs}</span></div>
+    <div class="list">${DATA.prs.map(([d,t,r,n])=>`<a class="li" href="#" style="grid-template-columns:64px minmax(0,1fr) 160px 56px"><span class="d mono" style="font-size:13px;color:var(--muted)">${d}</span><span style="font-size:15px;color:var(--text);overflow:hidden;text-overflow:ellipsis;white-space:nowrap">${t}</span><span class="name" style="font-size:13px;color:var(--muted)">${r}</span><span class="v" style="font-size:13px;color:var(--text2)">${n}</span></a>`).join('')}</div>
+  </div>
+  <div class="foot">Read from ~/.claude on this machine. Nothing leaves it. Active hours drop any gap over 10 minutes between messages.</div>`;
+  app.querySelectorAll('.ranges button').forEach(b=>b.onclick=()=>{range=b.dataset.r;render();});
+}
+const stat=(n,l)=>`<div class="stat"><div class="n">${n}</div><div class="l">${l}</div></div>`;
+const fmt=s=>{const d=d0(s);return ['Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec'][d.getMonth()]+' '+d.getDate();};
+render();
+</script>
+</body>
+</html>

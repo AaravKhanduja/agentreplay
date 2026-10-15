@@ -1,0 +1,52 @@
+<!doctype html><html><head><meta charset="utf-8">
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@400;500;600&family=IBM+Plex+Sans:wght@400;500;600&display=swap">
+<style>body{margin:0;background:#141413}</style>
+<!-- Reference render. Sample numbers are hardcoded in the script and markup; replace with real stats. See DESIGN.md. --></head><body>
+<div id="root"></div>
+<script>
+const accent='#d97757';
+const CELL=19, GAP=2, PITCH=CELL+GAP, COLS=53;
+const DAY=86400000, today=new Date(2026,9,14), gridStart=new Date(2025,9,13), usageStart=new Date(2026,2,2), streakStart=new Date(2026,6,3), streakEnd=new Date(2026,7,12);
+const total=Math.round((today-gridStart)/DAY)+1;
+const rnd=i=>{const x=Math.sin(i*9301+49297)*233280;return x-Math.floor(x);};
+const opacity=[0,0.2,0.38,0.56,0.78,1.0];
+let cells='';
+for(let i=0;i<COLS*7;i++){const d=new Date(gridStart.getTime()+i*DAY);
+ const col=Math.floor(i/7), row=i%7, x=col*PITCH, y=row*PITCH;
+ if(i>=total){continue;}
+ let level=0; if(d>=usageStart){const wd=d.getDay();const r=rnd(i);const weekend=wd===0||wd===6;const p=weekend?0.45:0.82;if(r<p)level=1+Math.floor(rnd(i+1000)*5);if(d>=streakStart&&d<=streakEnd)level=Math.max(level,2+Math.floor(rnd(i+2000)*4));}
+ const bg=level===0?'#222120':accent;
+ cells+='<div style="position:absolute;left:'+x+'px;top:'+y+'px;width:'+CELL+'px;height:'+CELL+'px;border-radius:2px;background:'+bg+';opacity:'+(level===0?1:opacity[level])+'"></div>';}
+const sCol0=Math.floor(Math.round((streakStart-gridStart)/DAY)/7), sCol1=Math.floor(Math.round((streakEnd-gridStart)/DAY)/7);
+const box='<div style="position:absolute;left:'+(sCol0*PITCH-5)+'px;top:-5px;width:'+((sCol1-sCol0+1)*PITCH-GAP+10)+'px;height:'+(7*PITCH-GAP+10)+'px;border:1.5px solid '+accent+';border-radius:5px;box-sizing:border-box"></div>';
+const names=['Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec'];let months='';let lastM=-1;
+for(let i=0;i<total;i++){const d=new Date(gridStart.getTime()+i*DAY);if(d.getMonth()!==lastM){lastM=d.getMonth();if(i>0&&i<5)continue;const col=Math.floor(i/7);months+='<span style="position:absolute;left:'+(col*PITCH)+'px;top:0">'+names[lastM]+'</span>';}}
+const gridW=COLS*PITCH-GAP, gridH=7*PITCH-GAP;
+document.getElementById('root').innerHTML=`
+<div style="width: 1200px; height: 675px; box-sizing: border-box; background: #141413; color: #faf9f5; font-family: 'IBM Plex Sans', system-ui, sans-serif; padding: 44px 44px 40px; display: flex; flex-direction: column; position: relative; overflow: hidden">
+  <div style="display: flex; justify-content: space-between; align-items: center; font-family: 'IBM Plex Mono', monospace; font-size: 15px; color: #9a948a; letter-spacing: 0.02em">
+    <div style="display: flex; align-items: center; gap: 12px"><div style="width: 10px; height: 10px; background: ${accent}"></div><span>agentreplay</span></div>
+    <span>@aaravkhanduja · last 12 months</span>
+  </div>
+  <div style="margin-top: 44px; position: relative; height: 16px; font-family: 'IBM Plex Mono', monospace; font-size: 12px; color: #9a948a">${months}</div>
+  <div style="position: relative; width: ${gridW}px; height: ${gridH}px; margin-top: 8px">${cells}${box}</div>
+  <div style="flex: 1"></div>
+  <div style="display: flex; align-items: baseline; gap: 18px; flex-wrap: wrap">
+    <div style="font-family: 'IBM Plex Mono', monospace; font-size: 72px; line-height: 1; font-weight: 500; letter-spacing: -0.03em; color: ${accent}">41-day streak</div>
+    <div style="font-family: 'IBM Plex Mono', monospace; font-size: 15px; color: #9a948a">Jul 3 to Aug 12</div>
+  </div>
+  <div style="display: flex; align-items: baseline; gap: 40px; margin-top: 22px; flex-wrap: wrap">
+    <div style="display: flex; align-items: baseline; gap: 10px"><span style="font-family: 'IBM Plex Mono', monospace; font-size: 44px; line-height: 1; font-weight: 500; letter-spacing: -0.02em; color: #faf9f5">212h</span><span style="font-size: 16px; color: #9a948a">Claude worked</span></div>
+    <div style="display: flex; align-items: baseline; gap: 10px"><span style="font-family: 'IBM Plex Mono', monospace; font-size: 44px; line-height: 1; font-weight: 500; letter-spacing: -0.02em; color: #faf9f5">106h</span><span style="font-size: 16px; color: #9a948a">you spent directing it</span></div>
+    <div style="display: flex; align-items: baseline; gap: 10px"><span style="font-family: 'IBM Plex Mono', monospace; font-size: 44px; line-height: 1; font-weight: 500; letter-spacing: -0.02em; color: ${accent}">2.0x</span><span style="font-size: 16px; color: #9a948a">leverage</span></div>
+  </div>
+  <div style="flex: 1"></div>
+  <div style="display: grid; grid-template-columns: repeat(5, minmax(0, 1fr)); gap: 0; border-top: 1px solid #2b2a27; padding-top: 20px">
+    <div style="display: flex; flex-direction: column; gap: 4px"><div style="font-family: 'IBM Plex Mono', monospace; font-size: 30px; font-weight: 500; color: #faf9f5">1,402</div><div style="font-size: 13px; color: #9a948a">sessions</div></div>
+    <div style="display: flex; flex-direction: column; gap: 4px"><div style="font-family: 'IBM Plex Mono', monospace; font-size: 30px; font-weight: 500; color: #faf9f5">318h</div><div style="font-size: 13px; color: #9a948a">active hours</div></div>
+    <div style="display: flex; flex-direction: column; gap: 4px"><div style="font-family: 'IBM Plex Mono', monospace; font-size: 30px; font-weight: 500; color: #faf9f5">+84.2k</div><div style="font-size: 13px; color: #9a948a">lines written</div></div>
+    <div style="display: flex; flex-direction: column; gap: 4px"><div style="font-family: 'IBM Plex Mono', monospace; font-size: 30px; font-weight: 500; color: #faf9f5">8.3B</div><div style="font-size: 13px; color: #9a948a">tokens</div></div>
+    <div style="display: flex; flex-direction: column; gap: 4px"><div style="font-family: 'IBM Plex Mono', monospace; font-size: 30px; font-weight: 500; color: #faf9f5">23</div><div style="font-size: 13px; color: #9a948a">PRs opened</div></div>
+  </div>
+</div>`;
+</script></body></html>
