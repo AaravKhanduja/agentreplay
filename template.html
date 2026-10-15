@@ -458,22 +458,34 @@ async function openExport(){
     const a = h('a', {href: URL.createObjectURL(blob), download: 'agentreplay-card.png'});
     a.click(); setTimeout(() => URL.revokeObjectURL(a.href), 1000);
   }, 'image/png');
-  const copy = async () => {
+  const paste = /Mac|iPhone|iPad/.test(navigator.platform) ? '⌘V' : 'Ctrl+V';
+  // Starts the clipboard write synchronously, inside the click, which is what
+  // browsers require; the PNG itself is handed over when it's encoded.
+  const copyCard = () => {
     try {
       const blob = new Promise(resolve => canvas.toBlob(resolve, 'image/png'));
-      await navigator.clipboard.write([new ClipboardItem({'image/png': blob})]);
-      status.textContent = 'Copied. Paste it into your post.';
+      return navigator.clipboard.write([new ClipboardItem({'image/png': blob})]).then(() => true, () => false);
     } catch (e) {
-      download();
-      status.textContent = 'Copying is blocked here, so the PNG was downloaded instead.';
+      return Promise.resolve(false);
     }
   };
-  const post = () => window.open('https://x.com/intent/post?text=' + encodeURIComponent(shareText()), '_blank', 'noopener');
+  const copy = async () => {
+    if (await copyCard()) status.textContent = 'Copied. Paste it into your post.';
+    else { download(); status.textContent = 'Copying is blocked here, so the PNG was downloaded instead.'; }
+  };
+  // An X intent link can only carry text, so the card rides on the clipboard:
+  // copy it, open the composer, and the image is one paste away.
+  const post = async () => {
+    const copied = copyCard();
+    window.open('https://x.com/intent/post?text=' + encodeURIComponent(shareText()), '_blank', 'noopener');
+    if (await copied) status.textContent = `Card copied. Press ${paste} in the post to attach it.`;
+    else { download(); status.textContent = 'Card downloaded. Drag agentreplay-card.png into the post.'; }
+  };
   const overlay = h('div', {class:'overlay', onclick: e => { if (e.target === overlay) close(); }},
     h('div', {class:'panel'}, canvas,
       h('div', {class:'actions'},
         h('button', {class:'btn', onclick: copy}, 'Copy image'),
-        h('button', {class:'btn', onclick: post}, 'Post on X'),
+        h('button', {class:'btn', onclick: post}, 'Copy & post on X'),
         h('button', {class:'btn', onclick: download}, 'Download PNG'),
         status,
         h('button', {class:'btn', onclick: close}, 'Close'))));
