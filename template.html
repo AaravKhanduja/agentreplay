@@ -1,0 +1,498 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>agentreplay</title>
+<style>
+/*__FONTS__*/
+:root{--ground:#141413;--text:#faf9f5;--text2:#d6d1c7;--muted:#9a948a;--faint:#6b665d;--rule:#2b2a27;--track:#1c1f23;--cell:#222120;--bar2:#3d4652;--accent:#d97757;--friction:#7cc4d6;--line:#36342f;--mono:'IBM Plex Mono',ui-monospace,monospace;--sans:'IBM Plex Sans',system-ui,sans-serif}
+*{box-sizing:border-box}
+body{margin:0;background:var(--ground);color:var(--text);font-family:var(--sans)}
+a{color:var(--text2);text-decoration:none}a:hover{color:var(--text)}
+button{font:inherit}
+.wrap{max-width:1040px;margin:0 auto;padding:40px 16px 80px;display:flex;flex-direction:column;gap:52px}
+.mono{font-family:var(--mono)}
+.hdr{display:flex;justify-content:space-between;align-items:center;flex-wrap:wrap;gap:12px;font-family:var(--mono);font-size:14px;color:var(--muted)}
+.mark{width:10px;height:10px;background:var(--accent);display:inline-block}
+.ranges{display:flex;border:1px solid var(--line)}
+.ranges button{font-family:var(--mono);font-size:13px;padding:8px 14px;min-height:28px;border:0;border-right:1px solid var(--line);cursor:pointer;background:transparent;color:var(--muted)}
+.ranges button:last-child{border-right:0}
+.ranges button:hover{color:var(--text)}
+.ranges button.on{background:var(--text);color:var(--ground)}
+.btn{font-family:var(--mono);font-size:13px;border:1px solid var(--line);background:transparent;padding:8px 14px;color:var(--text);min-height:28px;display:inline-flex;align-items:center;cursor:pointer}
+.btn:hover{border-color:var(--muted)}
+.months{position:relative;height:16px;font-family:var(--mono);font-size:12px;color:var(--muted)}
+.months span{position:absolute;top:0}
+.grid{position:relative;max-width:100%;overflow-x:auto;padding:5px;margin:-5px}
+.grid .cells{position:relative}
+.grid .c{position:absolute;border-radius:2px}
+.streakbox{position:absolute;border:1.5px solid var(--accent);border-radius:5px;pointer-events:none}
+.headline{display:flex;align-items:baseline;gap:18px;flex-wrap:wrap}
+.headline .big{font-family:var(--mono);font-size:64px;line-height:1;font-weight:500;letter-spacing:-0.03em;color:var(--accent)}
+.headline .dates{font-family:var(--mono);font-size:15px;color:var(--muted)}
+.sentence{font-size:20px;color:var(--text2);line-height:1.4;margin-top:12px}
+.sentence b{font-weight:400;color:var(--accent)}
+.strip{display:grid;grid-template-columns:repeat(auto-fit,minmax(140px,1fr));gap:24px 16px;border-top:1px solid var(--rule);border-bottom:1px solid var(--rule);padding:24px 0}
+.stat .n{font-family:var(--mono);font-size:28px;font-weight:500}
+.stat .l{font-size:13px;color:var(--muted);margin-top:4px}
+.tools{font-family:var(--mono);font-size:13px;color:var(--muted);margin-top:-28px}
+.tools b{font-weight:400;color:var(--text)}
+h2{margin:0;font-size:18px;font-weight:600}
+.sec{display:flex;flex-direction:column;gap:18px}
+.sechdr{display:flex;justify-content:space-between;align-items:baseline;flex-wrap:wrap;gap:8px}
+.sechdr span{font-family:var(--mono);font-size:13px;color:var(--muted)}
+.rows{display:flex;flex-direction:column;gap:14px}
+.row{display:grid;gap:16px;align-items:center}
+.row .name{font-family:var(--mono);font-size:14px;color:var(--text2);overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.bar{height:14px;background:var(--track)}.bar i{display:block;height:100%}
+.row .v{font-family:var(--mono);font-size:14px;color:var(--text);text-align:right}
+.row .v2{font-family:var(--mono);font-size:14px;color:var(--muted);text-align:right}
+.two{display:grid;grid-template-columns:repeat(auto-fit,minmax(300px,1fr));gap:40px 48px}
+.heat{display:flex;flex-direction:column;gap:4px}
+.heat .r{display:grid;grid-template-columns:36px minmax(0,1fr);gap:8px;align-items:center}
+.heat .d{font-family:var(--mono);font-size:11px;color:var(--muted)}
+.heat .cells{display:grid;grid-template-columns:repeat(24,minmax(0,1fr));gap:2px}
+.heat .cells i{display:block;height:14px}
+.ticks{display:flex;justify-content:space-between;font-family:var(--mono);font-size:11px;color:var(--faint)}
+.note{font-size:14px;color:var(--text2)}
+.list{display:flex;flex-direction:column;border-top:1px solid var(--rule)}
+.list .li{display:grid;gap:16px;align-items:center;padding:14px 0;border-bottom:1px solid var(--rule)}
+.foot{font-family:var(--mono);font-size:12px;line-height:1.6;color:var(--faint);border-top:1px solid var(--rule);padding-top:20px}
+.empty{font-size:20px;color:var(--text2)}
+.overlay{position:fixed;inset:0;background:rgba(10,10,9,.82);display:flex;align-items:center;justify-content:center;padding:24px;z-index:10}
+.panel{background:var(--ground);border:1px solid var(--line);padding:20px;display:flex;flex-direction:column;gap:16px;max-width:100%}
+.panel canvas{display:block;width:960px;max-width:calc(100vw - 90px);height:auto;border:1px solid var(--rule)}
+.actions{display:flex;gap:10px;align-items:center;flex-wrap:wrap}
+.actions .status{font-family:var(--mono);font-size:12px;color:var(--muted);margin-left:auto}
+body.card{width:1200px;height:675px;overflow:hidden}
+body.card canvas{display:block;width:1200px;height:675px}
+</style>
+</head>
+<body>
+<div class="wrap" id="app"></div>
+<script type="application/json" id="data">/*__DATA__*/null</script>
+<script>
+'use strict';
+const D = JSON.parse(document.getElementById('data').textContent);
+const DAY = 86400000;
+const MONTHS = ['Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec'];
+const MONTHS_LONG = ['January','February','March','April','May','June','July','August','September','October','November','December'];
+const WEEKDAYS = ['Mon','Tue','Wed','Thu','Fri','Sat','Sun'];
+const WEEKDAYS_LONG = ['Monday','Tuesday','Wednesday','Thursday','Friday','Saturday','Sunday'];
+const OPACITY = [0, 0.2, 0.38, 0.56, 0.78, 1.0];
+const C = {ground:'#141413',text:'#faf9f5',text2:'#d6d1c7',muted:'#9a948a',rule:'#2b2a27',cell:'#222120',accent:'#d97757'};
+const MONO = "'IBM Plex Mono', ui-monospace, monospace", SANS = "'IBM Plex Sans', system-ui, sans-serif";
+const REPO = 'https://github.com/AaravKhanduja/agentreplay';
+const RANGE_LABELS = {all:'All time', d90:'90d', d30:'30d', d7:'7d'};
+
+// ---------------------------------------------------------------- helpers
+
+// Build DOM without innerHTML: every string from the data lands as text.
+function h(tag, attrs, ...kids){
+  const el = document.createElement(tag);
+  for (const [k, v] of Object.entries(attrs || {})){
+    if (v == null || v === false) continue;
+    if (k === 'style') el.style.cssText = v;
+    else if (k === 'class') el.className = v;
+    else if (k.startsWith('on')) el[k] = v;
+    else el.setAttribute(k, v);
+  }
+  for (const c of kids.flat(Infinity)) if (c != null && c !== false) el.append(c.nodeType ? c : String(c));
+  return el;
+}
+const day = s => { const [y,m,d] = s.split('-').map(Number); return new Date(y, m-1, d, 12); };
+const fmtDay = s => { const d = day(s); return MONTHS[d.getMonth()] + ' ' + d.getDate(); };
+const int = n => Math.round(n).toLocaleString('en-US');
+function compact(n){
+  for (const [unit, s] of [[1e9,'B'],[1e6,'M'],[1e3,'k']]){
+    if (n >= unit){ const v = n / unit; return (v >= 100 ? Math.round(v) : v.toFixed(1)) + s; }
+  }
+  return String(Math.round(n));
+}
+function hours(ms){ const v = ms / 3.6e6; return v >= 10 || v === 0 ? String(Math.round(v)) : v.toFixed(1); }
+const plural = (n, word) => int(n) + ' ' + word + (Math.round(n) === 1 ? '' : 's');
+const pct = (a, b) => b ? Math.round(100 * a / b) : 0;
+const hourLabel = hr => (hr % 12 || 12) + (hr < 12 ? 'am' : 'pm');
+const modelName = m => m.replace(/^claude-/, '');
+
+// ---------------------------------------------------------------- stats
+
+function stats(key){
+  const cut = D.cutoffs[key];
+  const sessions = D.sessions.filter(s => cut == null || s.start >= cut);
+  let agentMs = 0, youMs = 0;
+  for (const [a, b, k] of D.intervals){
+    if (cut != null && b <= cut) continue;
+    const ms = b - Math.max(a, cut == null ? a : cut);
+    if (k) agentMs += ms; else youMs += ms;
+  }
+  const tok = [0,0,0,0], lines = [0,0], tools = {}, models = {}, mcp = {}, projects = {};
+  const heat = Array.from({length:7}, () => new Array(24).fill(0));
+  let prompts = 0;
+  for (const s of sessions){
+    s.tok.forEach((n, i) => tok[i] += n);
+    lines[0] += s.lines[0]; lines[1] += s.lines[1];
+    prompts += s.prompts;
+    for (const [n, c] of Object.entries(s.tools)) tools[n] = (tools[n] || 0) + c;
+    for (const [m, [t, turns]] of Object.entries(s.models)){
+      const e = models[m] || (models[m] = [0, 0]); e[0] += t; e[1] += turns;
+    }
+    for (const [srv, v] of Object.entries(s.mcp)){
+      const e = mcp[srv] || (mcp[srv] = [0,0,0]); v.forEach((n, i) => e[i] += n);
+    }
+    const p = projects[s.project] || (projects[s.project] = {tokens:0, sessions:0});
+    p.tokens += s.tok[0] + s.tok[1] + s.tok[2] + s.tok[3]; p.sessions += 1;
+    for (const [wd, hr, n] of s.heat) heat[wd][hr] += n;
+  }
+  const first = sessions.length ? new Date(Math.min(...sessions.map(s => s.start))) : null;
+  return {
+    key, sessions: sessions.length, agentMs, youMs, activeMs: agentMs + youMs,
+    tokens: tok[0] + tok[1] + tok[2] + tok[3], cacheRead: tok[3], lines, prompts,
+    tools, models, mcp, heat, first,
+    projects: Object.entries(projects).sort((a, b) => b[1].tokens - a[1].tokens),
+    prs: D.prs.filter(p => cut == null || p.ts >= cut),
+  };
+}
+
+function headline(){
+  const s = D.streak.longest;
+  if (s && s.days > 7) return {big: s.days + '-day streak', dates: fmtDay(s.start) + ' to ' + fmtDay(s.end)};
+  return {big: plural(D.sessions.length, 'session'), dates: D.firstDay ? 'since ' + fmtDay(D.firstDay) : ''};
+}
+
+// [text, highlighted] parts of the one sentence, shared by page and card.
+function sentence(st){
+  const projects = st.projects.length;
+  let lead = plural(st.sessions, 'session');
+  if (st.key === 'all' || st.key === 'year'){
+    if (st.first){
+      const y = st.first.getFullYear() !== new Date().getFullYear() ? ' ' + st.first.getFullYear() : '';
+      lead += ' since ' + MONTHS_LONG[st.first.getMonth()] + y;
+    }
+  } else {
+    lead += ' in the last ' + st.key.slice(1) + ' days';
+  }
+  lead += ' across ' + plural(projects, 'project') + '. Claude worked ';
+  const agent = hours(st.agentMs);
+  return [[lead, false], [agent + (agent === '1' ? ' hour' : ' hours'), true],
+          ['. You spent ', false], [hours(st.youMs), true], [' directing it.', false]];
+}
+
+// ---------------------------------------------------------------- year grid
+
+function gridModel(){
+  const start = day(D.grid.start);
+  const cells = D.grid.levels.map((level, i) => {
+    const d = new Date(start.getTime() + i * DAY);
+    return {i, col: Math.floor(i / 7), row: i % 7, level, minutes: D.grid.minutes[i], date: d};
+  });
+  const months = []; let last = -1;
+  cells.forEach(c => {
+    if (c.date.getMonth() !== last){
+      last = c.date.getMonth();
+      if (c.i > 0 && c.i < 5) return;  // first month has too few days to label
+      months.push({col: c.col, name: MONTHS[last]});
+    }
+  });
+  let streak = null;
+  const s = D.streak.longest;
+  if (s){
+    const col = iso => Math.floor(Math.round((day(iso) - start) / DAY) / 7);
+    streak = {c0: Math.max(col(s.start), 0), c1: col(s.end)};
+  }
+  return {cells, months, streak};
+}
+
+function yearGrid(cell, gap){
+  const pitch = cell + gap, g = gridModel();
+  const W = 53 * pitch - gap, H = 7 * pitch - gap;
+  const box = h('div', {class:'cells', style:`width:${W}px;height:${H}px`});
+  for (const c of g.cells){
+    const label = `${fmtDay(c.date.getFullYear() + '-' + (c.date.getMonth()+1) + '-' + c.date.getDate())}: ${c.minutes} active min`;
+    box.append(h('div', {class:'c', title: label, style:
+      `left:${c.col*pitch}px;top:${c.row*pitch}px;width:${cell}px;height:${cell}px;` +
+      `background:${c.level ? 'var(--accent)' : 'var(--cell)'};opacity:${c.level ? OPACITY[c.level] : 1}`}));
+  }
+  if (g.streak && D.streak.longest.days > 1){
+    box.append(h('div', {class:'streakbox', style:
+      `left:${g.streak.c0*pitch-4}px;top:-4px;width:${(g.streak.c1-g.streak.c0+1)*pitch-gap+8}px;height:${H+8}px`}));
+  }
+  const months = h('div', {class:'months', style:`width:${W}px`},
+    g.months.map(m => h('span', {style:`left:${m.col*pitch}px`}, m.name)));
+  return h('div', {style:'display:flex;flex-direction:column;gap:8px'}, months, h('div', {class:'grid'}, box));
+}
+
+// ---------------------------------------------------------------- page
+
+let range = 'all';
+
+function stat(n, l){ return h('div', {class:'stat'}, h('div', {class:'n'}, n), h('div', {class:'l'}, l)); }
+function bar(width, top){ return h('div', {class:'bar'}, h('i', {style:`width:${width}%;background:${top ? 'var(--accent)' : 'var(--bar2)'}`})); }
+
+function header(){
+  const right = h('div', {style:'display:flex;gap:20px;align-items:center;flex-wrap:wrap'});
+  if (D.sessions.length){
+    right.append(
+      h('div', {class:'ranges'}, Object.entries(RANGE_LABELS).map(([k, label]) =>
+        h('button', {class: k === range ? 'on' : '', onclick: () => { range = k; render(); }}, label))),
+      h('button', {class:'btn', onclick: openExport}, 'Export card'));
+  }
+  return h('div', {class:'hdr'},
+    h('div', {style:'display:flex;align-items:center;gap:12px'},
+      h('span', {class:'mark'}), h('span', {style:'color:var(--text)'}, 'agentreplay'), h('span', {}, 'overview')),
+    right);
+}
+
+function render(){
+  const app = document.getElementById('app');
+  app.replaceChildren();
+  app.append(header());
+  if (!D.sessions.length){
+    app.append(h('div', {class:'empty'}, 'No Claude Code sessions found in ' + D.meta.source + '.'), footer());
+    return;
+  }
+  const st = stats(range);
+  const hl = headline();
+  app.append(yearGrid(17, 2));
+  app.append(h('div', {style:'margin-top:-16px'},
+    h('div', {class:'headline'}, h('div', {class:'big'}, hl.big), h('div', {class:'dates'}, hl.dates)),
+    h('div', {class:'sentence'}, sentence(st).map(([t, hi]) => hi ? h('b', {}, t) : t))));
+  app.append(h('div', {class:'strip'},
+    stat(int(st.sessions), 'sessions'),
+    stat(compact(st.tokens), `tokens, ${pct(st.cacheRead, st.tokens)}% cache reads`),
+    stat(hours(st.activeMs) + 'h', 'active hours, idle gaps removed'),
+    stat('+' + compact(st.lines[0]), 'lines written'),
+    stat(int(st.prs.length), 'PRs opened')));
+
+  const tools = Object.entries(st.tools).sort((a, b) => b[1] - a[1]).slice(0, 4);
+  if (tools.length){
+    app.append(h('div', {class:'tools'}, 'Most used tools: ',
+      tools.map(([n, c], i) => [i ? ' · ' : '', h('b', {}, n), ' ' + compact(c)])));
+  }
+
+  if (st.sessions){
+    const max = st.projects[0][1].tokens || 1;
+    app.append(h('div', {class:'sec'},
+      h('div', {class:'sechdr'}, h('h2', {}, 'Where the tokens went'), h('span', {}, 'by project · sessions')),
+      h('div', {class:'rows'}, st.projects.slice(0, 8).map(([name, p], i) =>
+        h('div', {class:'row', style:'grid-template-columns:180px minmax(0,1fr) 64px 64px'},
+          h('span', {class:'name', title: name}, name), bar(100 * p.tokens / max, i === 0),
+          h('span', {class:'v'}, compact(p.tokens)), h('span', {class:'v2'}, int(p.sessions)))))));
+    app.append(h('div', {class:'two'}, modelsSection(st), heatSection(st)));
+  }
+  const mcp = mcpSection(st); if (mcp) app.append(mcp);
+  const prs = prSection(st); if (prs) app.append(prs);
+  app.append(footer());
+}
+
+function modelsSection(st){
+  const rows = Object.entries(st.models).sort((a, b) => b[1][0] - a[1][0]);
+  const total = rows.reduce((n, [, v]) => n + v[0], 0) || 1;
+  const turns = rows.reduce((n, [, v]) => n + v[1], 0) || 1;
+  const max = rows.length ? rows[0][1][0] : 1;
+  let note = '';
+  if (rows.length === 1) note = `Every turn ran on ${modelName(rows[0][0])}.`;
+  else if (rows.length > 1) note = `${modelName(rows[0][0])} took ${pct(rows[0][1][0], total)}% of tokens on ${pct(rows[0][1][1], turns)}% of turns.`;
+  return h('div', {class:'sec'},
+    h('div', {class:'sechdr'}, h('h2', {}, 'Models you ran'), h('span', {}, 'share of tokens')),
+    h('div', {class:'rows', style:'gap:12px'}, rows.slice(0, 6).map(([m, [t]], i) =>
+      h('div', {class:'row', style:'grid-template-columns:150px minmax(0,1fr) 48px'},
+        h('span', {class:'name', style:'font-size:13px', title: m}, modelName(m)), bar(100 * t / max, i === 0),
+        h('span', {class:'v', style:'font-size:13px'}, pct(t, total) + '%')))),
+    note && h('div', {class:'note'}, note));
+}
+
+function heatSection(st){
+  let max = 0, peak = null, total = 0, late = 0, work = 0;
+  st.heat.forEach((row, wd) => row.forEach((n, hr) => {
+    total += n; if (hr >= 22) late += n; if (hr >= 9 && hr < 18) work += n;
+    if (n > max){ max = n; peak = [wd, hr]; }
+  }));
+  const rows = st.heat.map((row, wd) => h('div', {class:'r'},
+    h('span', {class:'d'}, WEEKDAYS[wd]),
+    h('div', {class:'cells'}, row.map((n, hr) => h('i', {
+      title: `${WEEKDAYS[wd]} ${hourLabel(hr)}: ${plural(n, 'prompt')}`,
+      style: n ? `background:var(--accent);opacity:${(0.08 + 0.92 * n / max).toFixed(2)}` : 'background:var(--cell)'})))));
+  rows.push(h('div', {class:'r'}, h('span'), h('div', {class:'ticks'},
+    ['12am','6am','12pm','6pm','11pm'].map(t => h('span', {}, t)))));
+  let note = '';
+  if (peak){
+    note = `Peak is ${hourLabel(peak[1])} on ${WEEKDAYS_LONG[peak[0]]}s. `;
+    note += pct(late, total) >= 10 ? `${pct(late, total)}% of your prompts land after 10pm.`
+                                   : `${pct(work, total)}% of your prompts land between 9am and 6pm.`;
+  }
+  return h('div', {class:'sec'},
+    h('div', {class:'sechdr'}, h('h2', {}, 'When you work'), h('span', {}, 'your prompts · local time')),
+    h('div', {class:'heat'}, rows),
+    note && h('div', {class:'note'}, note));
+}
+
+function mcpSection(st){
+  const rows = Object.entries(st.mcp).map(([name, [calls, err, declined]]) => {
+    const ran = calls - declined;
+    return {name, calls, rate: ran > 0 ? err / ran : null};
+  }).sort((a, b) => b.calls - a.calls).slice(0, 6);
+  if (!rows.length) return null;
+  const worst = Math.max(...rows.map(r => r.rate || 0));
+  return h('div', {class:'sec'},
+    h('div', {class:'sechdr'}, h('h2', {}, 'Top MCP servers'), h('span', {}, 'calls · error rate')),
+    h('div', {class:'list'}, rows.map(r =>
+      h('div', {class:'li', style:'grid-template-columns:minmax(0,1fr) 72px 56px;padding:12px 0'},
+        h('span', {class:'name'}, r.name), h('span', {class:'v'}, int(r.calls)),
+        h('span', {class:'v', style:`color:${worst > 0 && r.rate === worst ? 'var(--friction)' : 'var(--muted)'}`},
+          r.rate == null ? '–' : Math.round(100 * r.rate) + '%')))));
+}
+
+function prSection(st){
+  if (!st.prs.length) return null;
+  return h('div', {class:'sec'},
+    h('div', {class:'sechdr'}, h('h2', {}, 'PRs you opened'), h('span', {}, 'from gh pr create · ' + st.prs.length)),
+    h('div', {class:'list'}, st.prs.map(p =>
+      h('a', {class:'li', href: p.url, target:'_blank', rel:'noopener', style:'grid-template-columns:64px minmax(0,1fr) 160px 56px'},
+        h('span', {class:'mono', style:'font-size:13px;color:var(--muted)'}, fmtDay(p.date)),
+        h('span', {style:'font-size:15px;color:var(--text);overflow:hidden;text-overflow:ellipsis;white-space:nowrap'}, p.title),
+        h('span', {class:'name', style:'font-size:13px;color:var(--muted)'}, p.repo),
+        h('span', {class:'v', style:'font-size:13px;color:var(--text2)'}, '#' + p.number)))));
+}
+
+function footer(){
+  const lines = [
+    `Read from ${D.meta.source} on this machine. Nothing leaves it.`,
+    `Active hours count the gaps between messages and drop any gap over ${D.meta.idleGapMinutes} minutes; overlapping sessions count once.`,
+    `A gap is Claude's time if it ends in Claude's reply or a tool result, yours if it ends in your prompt.`,
+  ];
+  if (D.meta.skippedLines) lines.push(`${plural(D.meta.skippedLines, 'unreadable line')} skipped.`);
+  return h('div', {class:'foot'}, lines.map(l => h('div', {}, l)));
+}
+
+// ---------------------------------------------------------------- card
+
+const CARD_W = 1200, CARD_H = 675;
+
+async function fontsReady(){
+  if (!document.fonts) return;
+  await Promise.all([`500 72px ${MONO}`, `400 15px ${MONO}`, `400 21px ${SANS}`]
+    .map(f => document.fonts.load(f).catch(() => null)));
+  await document.fonts.ready;
+}
+
+function drawCard(canvas){
+  const scale = 2;
+  canvas.width = CARD_W * scale; canvas.height = CARD_H * scale;
+  const ctx = canvas.getContext('2d');
+  ctx.scale(scale, scale);
+  ctx.fillStyle = C.ground; ctx.fillRect(0, 0, CARD_W, CARD_H);
+  ctx.textBaseline = 'alphabetic';
+  const L = 44, R = CARD_W - 44;
+
+  // Header.
+  ctx.fillStyle = C.accent; ctx.fillRect(L, 49, 10, 10);
+  ctx.font = `400 15px ${MONO}`; ctx.fillStyle = C.muted;
+  ctx.textAlign = 'left'; ctx.fillText('agentreplay', L + 22, 59);
+  ctx.textAlign = 'right';
+  ctx.fillText((D.meta.handle ? D.meta.handle + ' · ' : '') + 'last 12 months', R, 59);
+  ctx.textAlign = 'left';
+
+  // Month labels and the year grid.
+  const CELL = 19, GAP = 2, P = CELL + GAP, top = 132, g = gridModel();
+  ctx.font = `400 12px ${MONO}`; ctx.fillStyle = C.muted;
+  for (const m of g.months) ctx.fillText(m.name, L + m.col * P, top - 10);
+  for (const c of g.cells){
+    ctx.globalAlpha = c.level ? OPACITY[c.level] : 1;
+    ctx.fillStyle = c.level ? C.accent : C.cell;
+    roundRect(ctx, L + c.col * P, top + c.row * P, CELL, CELL, 2); ctx.fill();
+  }
+  ctx.globalAlpha = 1;
+  if (g.streak && D.streak.longest.days > 1){
+    ctx.strokeStyle = C.accent; ctx.lineWidth = 1.5;
+    roundRect(ctx, L + g.streak.c0 * P - 4.25, top - 4.25, (g.streak.c1 - g.streak.c0 + 1) * P - GAP + 8.5, 7 * P - GAP + 8.5, 5);
+    ctx.stroke();
+  }
+
+  // Headline and sentence.
+  const st = stats('year'), hl = headline();
+  ctx.font = `500 72px ${MONO}`; ctx.fillStyle = C.accent;
+  if (ctx.letterSpacing !== undefined) ctx.letterSpacing = '-2px';
+  ctx.fillText(hl.big, L, 418);
+  const w = ctx.measureText(hl.big).width;
+  if (ctx.letterSpacing !== undefined) ctx.letterSpacing = '0px';
+  ctx.font = `400 15px ${MONO}`; ctx.fillStyle = C.muted;
+  ctx.fillText(hl.dates, L + w + 18, 418);
+  ctx.font = `400 21px ${SANS}`;
+  let x = L;
+  for (const [t, hi] of sentence(st)){
+    ctx.fillStyle = hi ? C.accent : C.text2; ctx.fillText(t, x, 470); x += ctx.measureText(t).width;
+  }
+
+  // Strip.
+  const stripTop = 555, colW = (R - L) / 5;
+  ctx.fillStyle = C.rule; ctx.fillRect(L, stripTop, R - L, 1);
+  const cells = [[int(st.sessions), 'sessions'], [hours(st.activeMs) + 'h', 'active hours'],
+                 ['+' + compact(st.lines[0]), 'lines written'], [compact(st.tokens), 'tokens'],
+                 [int(st.prs.length), 'PRs opened']];
+  cells.forEach(([n, l], i) => {
+    ctx.font = `500 30px ${MONO}`; ctx.fillStyle = C.text; ctx.fillText(n, L + i * colW, stripTop + 52);
+    ctx.font = `400 13px ${SANS}`; ctx.fillStyle = C.muted; ctx.fillText(l, L + i * colW, stripTop + 78);
+  });
+}
+
+function roundRect(ctx, x, y, w, h, r){
+  ctx.beginPath();
+  ctx.moveTo(x + r, y); ctx.arcTo(x + w, y, x + w, y + h, r); ctx.arcTo(x + w, y + h, x, y + h, r);
+  ctx.arcTo(x, y + h, x, y, r); ctx.arcTo(x, y, x + w, y, r); ctx.closePath();
+}
+
+function shareText(){
+  const st = stats('year'), hl = headline();
+  return `${hl.big} with Claude Code. Claude worked ${hours(st.agentMs)} hours; I spent ${hours(st.youMs)} directing it.\n\n` +
+         `See yours, fully local: ${REPO}`;
+}
+
+async function openExport(){
+  await fontsReady();
+  const canvas = h('canvas');
+  drawCard(canvas);
+  const status = h('span', {class:'status'});
+  const close = () => { overlay.remove(); document.removeEventListener('keydown', onKey); };
+  const onKey = e => { if (e.key === 'Escape') close(); };
+  const download = () => canvas.toBlob(blob => {
+    const a = h('a', {href: URL.createObjectURL(blob), download: 'agentreplay-card.png'});
+    a.click(); setTimeout(() => URL.revokeObjectURL(a.href), 1000);
+  }, 'image/png');
+  const copy = async () => {
+    try {
+      const blob = new Promise(resolve => canvas.toBlob(resolve, 'image/png'));
+      await navigator.clipboard.write([new ClipboardItem({'image/png': blob})]);
+      status.textContent = 'Copied. Paste it into your post.';
+    } catch (e) {
+      download();
+      status.textContent = 'Copying is blocked here, so the PNG was downloaded instead.';
+    }
+  };
+  const post = () => window.open('https://x.com/intent/post?text=' + encodeURIComponent(shareText()), '_blank', 'noopener');
+  const overlay = h('div', {class:'overlay', onclick: e => { if (e.target === overlay) close(); }},
+    h('div', {class:'panel'}, canvas,
+      h('div', {class:'actions'},
+        h('button', {class:'btn', onclick: copy}, 'Copy image'),
+        h('button', {class:'btn', onclick: post}, 'Post on X'),
+        h('button', {class:'btn', onclick: download}, 'Download PNG'),
+        status,
+        h('button', {class:'btn', onclick: close}, 'Close'))));
+  document.addEventListener('keydown', onKey);
+  document.body.append(overlay);
+}
+
+// ---------------------------------------------------------------- boot
+
+if (D.mode === 'card'){
+  document.body.className = 'card';
+  const canvas = h('canvas');
+  document.getElementById('app').replaceWith(canvas);
+  fontsReady().then(() => drawCard(canvas));
+} else {
+  render();
+}
+</script>
+</body>
+</html>

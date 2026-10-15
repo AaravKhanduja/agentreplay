@@ -330,10 +330,13 @@ def analyze(projects_dir, tz, now=None):
             "skippedLines": stats["skippedLines"],
             "idleGapMinutes": IDLE_GAP_MS // 60000,
         },
+        # Session-start cutoffs (epoch ms, local midnight) for each range;
+        # `year` is the share card's last 12 months.
         "cutoffs": {
             k: (None if n is None else origin - (n - 1) * 86400000)
-            for k, n in RANGES.items()
+            for k, n in dict(RANGES, year=GRID_DAYS).items()
         },
+        "firstDay": first_day(rows, tz),
         "grid": grid,
         "streak": streaks(days, today),
         "sessions": [strip_row(r) for r in rows],
@@ -419,6 +422,12 @@ def read_user(record, row, calls, prs, tz):
                     "number": int(number),
                     "url": match.group(0),
                 })
+
+
+def first_day(rows, tz):
+    if not rows:
+        return None
+    return datetime.fromtimestamp(min(r["start"] for r in rows) / 1000, tz).date().isoformat()
 
 
 def project_name(session):

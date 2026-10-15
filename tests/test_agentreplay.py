@@ -124,5 +124,30 @@ class UnitTest(unittest.TestCase):
         self.assertEqual(payload["streak"], {"longest": None, "current": 0})
 
 
+class RenderTest(unittest.TestCase):
+    def test_script_injection_is_inert(self):
+        payload = {"x": "</script><img src=x onerror=alert(1)> "}
+        html = ar.render(payload, "page", template="<script>/*__DATA__*/null</script>")
+        self.assertNotIn("</script><img", html)
+        self.assertNotIn(" ", html)
+
+    def test_output_has_no_network_references(self):
+        payload = ar.analyze(FIXTURES, timezone.utc, now=NOW)
+        payload["prs"] = []
+        for mode in ("page", "card"):
+            html = ar.render(payload, mode)
+            urls = set(re.findall(r"https?://[^\s\"'`)]+", html))
+            # The X share intent and the repo link open only when clicked.
+            allowed = {u for u in urls if u.startswith(("https://x.com/intent/", "https://github.com/AaravKhanduja/agentreplay"))}
+            self.assertEqual(urls - allowed, set(), mode)
+            self.assertNotIn("<link", html)
+
+    def test_data_round_trips(self):
+        payload = ar.analyze(FIXTURES, timezone.utc, now=NOW)
+        html = ar.render(payload, "card")
+        raw = re.search(r'<script type="application/json" id="data">(.*?)</script>', html, re.S).group(1)
+        self.assertEqual(json.loads(raw)["sessions"], payload["sessions"])
+
+
 if __name__ == "__main__":
     unittest.main()
