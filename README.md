@@ -6,6 +6,17 @@ AgentReplay reads the session logs Claude Code keeps in `~/.claude` and shows yo
 
 One Python file, no dependencies, nothing leaves your machine.
 
+![The share card: a year grid, a 48-day streak, and five figures](docs/card.png)
+
+<details>
+<summary>The overview page</summary>
+
+![The overview page: year grid, streak, tokens by project, models, when you work, MCP servers and PRs](docs/overview.png)
+
+</details>
+
+Both images are made from generated sample data, not a real account.
+
 ## Quickstart
 
 ```sh
