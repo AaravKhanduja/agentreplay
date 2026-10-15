@@ -25,7 +25,9 @@ button{font:inherit}
 .btn:focus-visible,.ranges button:focus-visible{outline:1px solid var(--muted);outline-offset:2px}
 .months{position:relative;height:16px;font-family:var(--mono);font-size:12px;color:var(--muted)}
 .months span{position:absolute;top:0}
-.grid{position:relative;max-width:100%;overflow-x:auto;padding:5px;margin:-5px}
+.days{position:relative;flex:none;width:28px;font-family:var(--mono);font-size:12px;color:var(--muted)}
+.days span{position:absolute;left:0;line-height:1;transform:translateY(-50%)}
+.grid{position:relative;min-width:0;max-width:100%;overflow-x:auto;padding:5px;margin:-5px}
 .grid .cells{position:relative}
 .grid .c{position:absolute;border-radius:2px;opacity:var(--o);transition:transform .15s ease,filter .2s ease,box-shadow .15s ease;animation:pop .75s cubic-bezier(.33,0,.2,1) backwards}
 .grid .cells:hover .c{filter:brightness(.5)}
@@ -283,9 +285,13 @@ function yearGrid(key, cell, gap){
     tip.classList.add('on');
   };
   box.onmouseleave = hideTip;
-  const months = h('div', {class:'months', style:`width:${W}px`},
+  // GitHub labels every other weekday; rows start on Monday, so Mon/Wed/Fri are rows 0, 2 and 4.
+  const days = h('div', {class:'days', style:`height:${H}px`},
+    [0, 2, 4].map(r => h('span', {style:`top:${r*pitch + cell/2}px`}, WEEKDAYS[r])));
+  const months = h('div', {class:'months', style:`width:${W}px;margin-left:32px`},
     g.months.map(m => h('span', {style:`left:${m.col*pitch}px`}, m.name)));
-  return h('div', {style:'display:flex;flex-direction:column;gap:8px'}, months, h('div', {class:'grid'}, box));
+  return h('div', {style:'display:flex;flex-direction:column;gap:8px'}, months,
+    h('div', {style:'display:flex;gap:4px'}, days, h('div', {class:'grid'}, box)));
 }
 
 // ---------------------------------------------------------------- page
@@ -339,7 +345,7 @@ function render(){
   }
   const st = stats(range);
   const hl = headline(st);
-  app.append(yearGrid(range, 17, 2));
+  app.append(yearGrid(range, 16, 2));
   app.append(h('div', {style:'margin-top:-16px'},
     h('div', {class:'headline'}, h('div', {class:'big'}, hl.big), h('div', {class:'dates'}, hl.dates)),
     h('div', {class:'sentence'}, sentence(st).map(([t, hi]) => hi ? h('b', {}, t) : t))));
