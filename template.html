@@ -85,6 +85,7 @@ a.li:hover{background:var(--track)}
 @keyframes grow{from{transform:scaleX(0)}}
 .intro>*{animation:rise 1s cubic-bezier(.33,0,.2,1) backwards}
 .swap>:not(.hdr){animation:fade .5s ease backwards}
+.wait,.wait *{animation-play-state:paused}
 @media (prefers-reduced-motion:reduce){*,*::before,*::after{animation:none!important;transition:none!important}}
 body.card{width:1200px;height:675px;overflow:hidden}
 body.card canvas{display:block;width:1200px;height:675px}
@@ -386,6 +387,18 @@ function render(){
   // Sections rise in one after another on load; a range switch just fades the new numbers in.
   app.className = 'wrap ' + (firstRender ? 'intro' : 'swap');
   if (firstRender) [...app.children].forEach((el, i) => { el.style.animationDelay = (i * 120) + 'ms'; });
+  // Sections below the fold hold their first frame until you scroll to them.
+  if (firstRender && MOTION && 'IntersectionObserver' in window){
+    const io = new IntersectionObserver(entries => entries.forEach(e => {
+      if (!e.isIntersecting) return;
+      e.target.style.animationDelay = '0ms';
+      e.target.classList.remove('wait');
+      io.unobserve(e.target);
+    }), {rootMargin: '0px 0px -10% 0px'});
+    for (const el of app.children){
+      if (el.getBoundingClientRect().top > innerHeight){ el.classList.add('wait'); io.observe(el); }
+    }
+  }
   firstRender = false;
   app.querySelectorAll('.headline .big, .stat .n').forEach(countUp);
 }
