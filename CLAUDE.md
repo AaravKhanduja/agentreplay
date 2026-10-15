@@ -21,12 +21,14 @@ python3 agentreplay.py --json                                 # real stats as JS
 
 ## Counting rules (all load-bearing)
 
+- **Two sources.** Claude Code deletes transcripts 30 days after last activity (`cleanupPeriodDays`), so `history.jsonl` (one line per typed prompt, never cleaned) carries the year: sessions, projects, grid, streak, heatmap. Slash commands and exact repeats are dropped. Transcripts carry the detail, counted only from `detailSince`, which is the oldest surviving session's last-activity day. From that day on every session survives, so detail is complete there. Every detail label says "since <day>" when the range reaches further back. With no history file, transcripts are the only source.
+
 - **Dedupe tokens by `message.id`, across all files.** One response is split over several lines with the same usage, and resumes and forks copy earlier records into a new file. Records are also deduped by `uuid`; the session whose file was created first owns copies. `<synthetic>` model records are not model calls.
 - **A human prompt is a typed one.** Exclude tool-result carriers (`type: user` with `tool_result` content), `isMeta`, sidechains, compact summaries, `<command-name>` and `<local-command` wrappers, `[Request interrupted`, and anything whose `origin.kind` isn't `human` (task notifications).
 - **Time.**
   - Gaps between consecutive user/assistant records count only up to 10 minutes (`IDLE_GAP_MS`).
   - Only Claude's working time counts: a gap that ends in an assistant record, a tool result, a subagent record or a machine message (`ends_claude_work`). A gap that ends in your prompt is you reading and typing, and is not shown anywhere.
-  - Intervals are unioned across sessions. The grid, the streak and every hour figure use this one measure.
+  - Intervals are unioned across sessions; every hour figure uses this one measure.
 - **Lines come from `toolUseResult.structuredPatch`.** A Write that creates a file counts its content. Fall back to the input's string newlines only when no patch exists. `.claude/` paths are the harness's, not the user's.
 - **A declined call is not an error** (`DECLINED_RE`).
 - **A PR counts only when its URL appears in the result.**

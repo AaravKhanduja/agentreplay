@@ -9,7 +9,9 @@ from pathlib import Path
 sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
 import agentreplay as ar  # noqa: E402
 
-FIXTURES = Path(__file__).resolve().parent / "fixtures" / "projects"
+import shutil  # noqa: E402
+
+FIXTURES = Path(__file__).resolve().parent / "fixtures"
 NOW = datetime(2026, 10, 15, 12, 0, tzinfo=timezone.utc)
 
 
@@ -23,7 +25,7 @@ def totals(payload):
         for server, v in r["mcp"].items():
             mcp[server] = [x + y for x, y in zip(mcp.get(server, [0, 0, 0]), v)]
     return {
-        "prompts": sum(r["prompts"] for r in rows),
+        "prompts": sum(n for _, _, n in payload["prompts"]),
         "tok": [sum(r["tok"][i] for r in rows) for i in range(4)],
         "lines": [sum(r["lines"][i] for r in rows) for i in range(2)],
         "worked_s": worked / 1000,
@@ -38,19 +40,27 @@ class FixtureTest(unittest.TestCase):
         cls.payload = ar.analyze(FIXTURES, timezone.utc, now=NOW)
         cls.t = totals(cls.payload)
 
-    def test_sessions_and_projects(self):
-        self.assertEqual(len(self.payload["sessions"]), 2)
-        self.assertEqual(sorted(r["project"] for r in self.payload["sessions"]), ["blog", "shop"])
+    def test_sessions_from_both_sources(self):
+        # History knows the old /tmp/old session whose transcript is gone;
+        # only the transcripts know /tmp/notes.
+        self.assertEqual(len(self.payload["allSessions"]), 4)
+        self.assertEqual(sorted(self.payload["projects"]), ["blog", "notes", "old", "shop"])
+        self.assertEqual(self.payload["firstDay"], "2026-06-01")
+        self.assertEqual(len(self.payload["sessions"]), 3)
+
+    def test_detail_starts_where_transcripts_are_complete(self):
+        # The oldest surviving session's last activity is Oct 10, so the
+        # notes session's Oct 1 exchange is not counted, its Oct 12 one is.
+        self.assertEqual(self.payload["detailSince"], "2026-10-10")
 
     def test_tokens_dedupe_split_and_subagent_copies(self):
         # m1 split over two lines and m2 repeated in a subagent count once;
-        # the <synthetic> record is not a model call.
-        self.assertEqual(self.t["tok"], [52, 152, 400, 39600])
+        # the <synthetic> record is not a model call; nm1 is before detailSince.
+        self.assertEqual(self.t["tok"], [53, 153, 400, 39600])
 
-    def test_human_prompts(self):
-        # Tool results, the interrupt, /clear, meta caveats, task notifications,
-        # the subagent's prompt and the copied record are not yours.
-        self.assertEqual(self.t["prompts"], 4)
+    def test_prompts_from_history(self):
+        # /clear and the exact repeat are dropped.
+        self.assertEqual(self.t["prompts"], 6)
 
     def test_lines_written(self):
         # structuredPatch +2 -1, Write create +3, fallback +1 -2, harness file skipped.
@@ -75,27 +85,46 @@ class FixtureTest(unittest.TestCase):
     def test_claude_working_time(self):
         # 14:00-14:15, 14:16-14:17 and 14:28-14:29 are Claude's. The gaps
         # ending in /clear and the meta line are you, the 11-minute gap is
-        # idle, and blog's overlapping time is already covered.
-        self.assertEqual(self.t["worked_s"], 1020)
+        # idle, and blog's overlapping time is already covered. Plus notes'
+        # two minutes on Oct 12.
+        self.assertEqual(self.t["worked_s"], 1140)
 
     def test_bad_lines_counted(self):
         self.assertEqual(self.payload["meta"]["skippedLines"], 2)
 
-    def test_streak(self):
+    def test_streak_from_history(self):
         self.assertEqual(
             self.payload["streak"],
-            {"longest": {"start": "2026-10-10", "end": "2026-10-10", "days": 1}, "current": 0},
+            {"longest": {"start": "2026-06-01", "end": "2026-06-02", "days": 2}, "current": 0},
         )
+
+
+class NoHistoryTest(unittest.TestCase):
+    def test_falls_back_to_transcript_prompts(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            shutil.copytree(FIXTURES / "projects", Path(tmp) / "projects")
+            payload = ar.analyze(Path(tmp), timezone.utc, now=NOW)
+        # Tool results, the interrupt, /clear, meta caveats, task notifications,
+        # the subagent's prompt and the copied record are not yours; notes'
+        # Oct 1 prompt is before detailSince.
+        self.assertEqual(totals(payload)["prompts"], 5)
+        self.assertFalse(payload["meta"]["hasHistory"])
+        self.assertEqual(len(payload["allSessions"]), 3)
 
 
 class UnitTest(unittest.TestCase):
     def test_union_merges_overlaps(self):
         self.assertEqual(ar.union([(10, 20), (0, 12), (30, 40)]), [[0, 20], [30, 40]])
 
-    def test_minutes_split_at_local_midnight(self):
-        start = datetime(2026, 3, 1, 23, 50, tzinfo=timezone.utc).timestamp() * 1000
-        days = ar.active_minutes_by_day([(start, start + 20 * 60000)], timezone.utc)
-        self.assertEqual(days, {date(2026, 3, 1): 10, date(2026, 3, 2): 10})
+    def test_history_buckets_in_local_time(self):
+        # 23:30 UTC on Jun 1 is Jun 2, 5am in Kolkata.
+        from zoneinfo import ZoneInfo
+        with tempfile.TemporaryDirectory() as tmp:
+            path = Path(tmp) / "history.jsonl"
+            ts = int(datetime(2026, 6, 1, 23, 30, tzinfo=timezone.utc).timestamp() * 1000)
+            path.write_text(json.dumps({"display": "hi", "timestamp": ts, "project": "/x", "sessionId": "s"}) + "\n")
+            history = ar.read_history(path, ZoneInfo("Asia/Kolkata"), ar.Counter())
+        self.assertEqual(dict(history["buckets"]), {("2026-06-02", 5): 1})
 
     def test_streaks(self):
         days = {date(2026, 10, d): 5 for d in (1, 2, 3, 5, 6, 14, 15)}
@@ -116,7 +145,7 @@ class UnitTest(unittest.TestCase):
 
     def test_empty_dir(self):
         with tempfile.TemporaryDirectory() as tmp:
-            payload = ar.analyze(Path(tmp) / "projects", timezone.utc, now=NOW)
+            payload = ar.analyze(Path(tmp), timezone.utc, now=NOW)
         self.assertEqual(payload["sessions"], [])
         self.assertEqual(payload["streak"], {"longest": None, "current": 0})
 

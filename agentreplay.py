@@ -218,6 +218,29 @@ def mcp_server(name):
     return server.replace("_", " ")
 
 
+def read_history(path, tz, stats):
+    """Prompts from history.jsonl: one line per prompt you typed, kept long
+    after the transcripts are cleaned up. Slash commands and exact repeats
+    are dropped. Returns None if there is no history file."""
+    if not path.is_file():
+        return None
+    sessions, buckets, seen = {}, Counter(), set()
+    for record in read_jsonl(path, stats):
+        ts, sid = record.get("timestamp"), record.get("sessionId")
+        text = str(record.get("display") or "").strip()
+        if not isinstance(ts, (int, float)) or not isinstance(sid, str) or not text:
+            continue
+        if text.startswith("/") or (ts, sid, text) in seen:
+            continue
+        seen.add((ts, sid, text))
+        local = datetime.fromtimestamp(ts / 1000, tz)
+        buckets[(local.date().isoformat(), local.hour)] += 1
+        project = str(record.get("project") or "").rstrip("/") or "unknown"
+        if sid not in sessions or ts < sessions[sid][0]:
+            sessions[sid] = [int(ts), project]
+    return {"sessions": sessions, "buckets": buckets}
+
+
 # ---------------------------------------------------------------- analysis
 
 
@@ -256,11 +279,23 @@ def load_sessions(projects_dir, stats):
     return sessions
 
 
-def analyze(projects_dir, tz, now=None):
+def analyze(claude_dir, tz, now=None):
+    """Two sources. Transcripts (projects/) carry the detail but Claude Code
+    deletes them after 30 days by default; history.jsonl keeps every prompt,
+    so it carries the year: sessions, projects, prompts, the grid, streaks."""
     stats = Counter()
+    projects_dir = claude_dir / "projects"
     sessions = load_sessions(projects_dir, stats)
     now = now or datetime.now(tz)
     today = now.astimezone(tz).date()
+    # Cleanup deletes a session by its last activity, so every day from the
+    # oldest surviving session's last activity onward is fully covered.
+    # Detail is counted from that local midnight, so "since <day>" is exact.
+    since = None
+    if sessions:
+        oldest_last = min(s["records"][-1]["_ts"] for s in sessions)
+        since = datetime.fromtimestamp(oldest_last / 1000, tz).date()
+    since_ms = int(datetime.combine(since, time(), tz).timestamp() * 1000) if since else 0
 
     seen_records = set()
     seen_messages = set()
@@ -271,7 +306,8 @@ def analyze(projects_dir, tz, now=None):
 
     for session in sessions:
         row = {
-            "start": session["first"],
+            "start": None,  # first record counted for detail
+            "first": session["first"],
             "project": project_name(session),
             "prompts": 0,
             "tok": [0, 0, 0, 0],  # input, output, cache write, cache read
@@ -280,6 +316,7 @@ def analyze(projects_dir, tz, now=None):
             "tools": Counter(),
             "mcp": {},
             "heat": Counter(),
+            "id": session["key"][1],
         }
         timeline = []
         for record in session["records"]:
@@ -289,11 +326,15 @@ def analyze(projects_dir, tz, now=None):
                     continue
                 seen_records.add(uid)
             timeline.append(record)
+            if record["_ts"] < since_ms:
+                continue
+            if row["start"] is None:
+                row["start"] = record["_ts"]
             if record.get("type") == "assistant":
                 read_assistant(record, row, seen_messages, seen_tools, calls)
             elif record.get("type") == "user":
                 read_user(record, row, calls, prs, tz)
-        if not timeline:
+        if not timeline or row["start"] is None:
             continue
 
         last = None
@@ -302,31 +343,49 @@ def analyze(projects_dir, tz, now=None):
             if working is None:
                 continue
             ts = record["_ts"]
-            if working and last is not None and 0 < ts - last <= IDLE_GAP_MS:
-                spans.append((last, ts))
+            if working and last is not None and 0 < ts - last <= IDLE_GAP_MS and ts > since_ms:
+                spans.append((max(last, since_ms), ts))
             last = ts
 
         row["tools"] = dict(row["tools"])
-        row["heat"] = [[wd, h, n] for (wd, h), n in sorted(row["heat"].items())]
         rows.append(row)
 
     # Overlapping sessions count once.
     intervals = union(spans)
-    days = active_minutes_by_day(intervals, tz)
-    names = disambiguate([r["project"] for r in rows])
-    for r, name in zip(rows, names):
-        r["project"] = name[0]
-        r["path"] = name[1]
+
+    history = read_history(claude_dir / "history.jsonl", tz, stats)
+    if history is None:
+        # No prompt history: fall back to what the transcripts hold.
+        history = {"sessions": {}, "buckets": Counter()}
+        for r in rows:
+            history["buckets"].update(r["heat"])
+    # Every session either source knows about, by id; a transcript fills in
+    # what the history lacks.
+    every = dict(history["sessions"])
+    for r in rows:
+        if r["id"] not in every or r["first"] < every[r["id"]][0]:
+            every[r["id"]] = [r["first"], r["project"][1]]
+
+    paths = sorted({path for _, path in every.values()} | {r["project"][1] for r in rows})
+    names = dict(zip(paths, disambiguate([(os.path.basename(p.rstrip("/")) or p, p) for p in paths])))
+    index = {path: i for i, path in enumerate(paths)}
+    for r in rows:
+        r["project"] = index[r["project"][1]]
+
+    prompt_days = Counter()
+    for (day, _hour), n in history["buckets"].items():
+        prompt_days[date.fromisoformat(day)] += n
 
     prs.sort(key=lambda p: p["ts"], reverse=True)
     origin = int(datetime.combine(today, time(), tz).timestamp() * 1000)
-    grid = year_grid(days, today)
+    detail_since = since.isoformat() if since else None
     return {
         "meta": {
             "today": today.isoformat(),
             "tz": str(tz),
             "generatedAt": now.isoformat(timespec="seconds"),
-            "source": str(projects_dir),
+            "source": str(claude_dir),
+            "hasHistory": bool(history["sessions"]),
             "files": stats["files"],
             "skippedLines": stats["skippedLines"],
             "idleGapMinutes": IDLE_GAP_MS // 60000,
@@ -337,9 +396,22 @@ def analyze(projects_dir, tz, now=None):
             k: (None if n is None else origin - (n - 1) * 86400000)
             for k, n in dict(RANGES, year=GRID_DAYS).items()
         },
-        "firstDay": first_day(rows, tz),
-        "grid": grid,
-        "streak": streaks(days, today),
+        "cutoffDays": {
+            k: (None if n is None else (today - timedelta(days=n - 1)).isoformat())
+            for k, n in dict(RANGES, year=GRID_DAYS).items()
+        },
+        "firstDay": first_day([start for start, _ in every.values()], tz),
+        # The first day the surviving transcripts cover. Tokens, hours, lines,
+        # tools, models, MCP and PRs are only known from here on.
+        "detailSince": detail_since,
+        "projects": [names[p][0] for p in paths],
+        # [start ms, project index] for every session in either source.
+        "allSessions": sorted([start, index[path]] for start, path in every.values()),
+        # [local date, hour, prompts you typed].
+        "prompts": [[d, h, n] for (d, h), n in sorted(history["buckets"].items())],
+        "grid": year_grid(prompt_days, today),
+        "streak": streaks(prompt_days, today),
+        # Per-transcript detail rows.
         "sessions": [strip_row(r) for r in rows],
         # [start ms, end ms] of Claude's working time, disjoint and sorted.
         "intervals": intervals,
@@ -387,7 +459,7 @@ def read_user(record, row, calls, prs, tz):
     if is_human_prompt(record):
         row["prompts"] += 1
         local = datetime.fromtimestamp(record["_ts"] / 1000, tz)
-        row["heat"][(local.weekday(), local.hour)] += 1
+        row["heat"][(local.date().isoformat(), local.hour)] += 1
         return
     for block in tool_results(record):
         call = calls.pop(block.get("tool_use_id"), None)
@@ -425,10 +497,10 @@ def read_user(record, row, calls, prs, tz):
                 })
 
 
-def first_day(rows, tz):
-    if not rows:
+def first_day(starts, tz):
+    if not starts:
         return None
-    return datetime.fromtimestamp(min(r["start"] for r in rows) / 1000, tz).date().isoformat()
+    return datetime.fromtimestamp(min(starts) / 1000, tz).date().isoformat()
 
 
 def project_name(session):
@@ -457,13 +529,11 @@ def strip_row(row):
     return {
         "start": row["start"],
         "project": row["project"],
-        "prompts": row["prompts"],
         "tok": row["tok"],
         "models": row["models"],
         "lines": row["lines"],
         "tools": row["tools"],
         "mcp": row["mcp"],
-        "heat": row["heat"],
     }
 
 
@@ -480,22 +550,9 @@ def union(spans):
     return merged
 
 
-def active_minutes_by_day(intervals, tz):
-    """Local date -> minutes Claude worked, splitting intervals at local midnight."""
-    days = defaultdict(float)
-    for a, b in intervals:
-        start = datetime.fromtimestamp(a / 1000, tz)
-        end = datetime.fromtimestamp(b / 1000, tz)
-        while start.date() < end.date():
-            midnight = datetime.combine(start.date() + timedelta(days=1), time(), tz)
-            days[start.date()] += (midnight - start).total_seconds() / 60
-            start = midnight
-        days[start.date()] += (end - start).total_seconds() / 60
-    return dict(days)
-
-
 def year_grid(days, today):
-    """53 weeks x 7 days ending today, Monday first, with quantile levels 0-5."""
+    """53 weeks x 7 days ending today, Monday first, with quantile levels 0-5
+    of the day's count (prompts you typed)."""
     first = today - timedelta(days=GRID_DAYS - 1)
     start = first - timedelta(days=first.weekday())
     count = (today - start).days + 1
@@ -506,7 +563,7 @@ def year_grid(days, today):
     return {
         "start": start.isoformat(),
         "levels": levels,
-        "minutes": [round(v) for v in values],
+        "counts": [round(v) for v in values],
     }
 
 
@@ -598,7 +655,7 @@ def main(argv=None):
 
     tz = resolve_tz(args.tz)
     claude_dir = DEMO_DIR if args.demo else Path(args.claude_dir).expanduser()
-    payload = analyze(claude_dir / "projects", tz)
+    payload = analyze(claude_dir, tz)
     handle = (args.handle or "").strip()
     if handle and not handle.startswith("@"):
         handle = "@" + handle
@@ -618,11 +675,12 @@ def main(argv=None):
     page.write_text(render(payload, "page", template), encoding="utf-8")
     card.write_text(render(payload, "card", template), encoding="utf-8")
 
-    n = len(payload["sessions"])
+    n = len(payload["allSessions"])
     if n == 0:
-        print(f"No Claude Code sessions found under {claude_dir / 'projects'}.")
+        print(f"No Claude Code sessions found under {claude_dir}.")
     else:
-        print(f"Read {n} sessions from {claude_dir / 'projects'}.")
+        print(f"Read {n} sessions from {claude_dir}; transcripts for "
+              f"{len(payload['sessions'])} of them remain, since {payload['detailSince']}.")
     if payload["meta"]["skippedLines"]:
         print(f"Skipped {payload['meta']['skippedLines']} unreadable lines.")
     print(f"Wrote {page}\nWrote {card}")

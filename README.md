@@ -33,13 +33,20 @@ On the overview, **Export card** shows the card. **Copy & post on X** copies the
 
 Every number is counted from the logs. Nothing is estimated, inferred or written by a model.
 
-- **Sessions**: session files under `~/.claude/projects`, with their subagent files folded in.
+There are two sources. Claude Code deletes full session transcripts 30 days after their last activity (the `cleanupPeriodDays` setting), but it keeps `~/.claude/history.jsonl`, one line per prompt you typed. So:
+
+- **From your prompt history, the whole year:** sessions, projects, the year grid, the streak, and when you work.
+- **From the transcripts that are left:** tokens, hours Claude worked, lines, tools, models, MCP calls and PRs. The page says where these start (e.g. "since Sep 1"): the day from which every session's transcript still exists, so the count from that day on is complete.
+
+If you'd like the detail to reach further back next year, raise `cleanupPeriodDays` in `~/.claude/settings.json`; transcripts already deleted can't be recovered.
+
+- **Sessions**: distinct session ids in your prompt history, plus any transcript the history doesn't mention. Subagent transcripts fold into their parent session.
 - **Tokens**: `input + output + cache write + cache read`, counted once per message. Claude Code writes one response across several lines, and a resumed session copies earlier messages, so tokens are deduplicated by message id.
 - **Hours Claude worked**: the gaps between consecutive messages that end in Claude's reply or a tool result, which is Claude thinking, writing, or running a tool. Any gap over 10 minutes is dropped as idle, a gap that ends in your prompt (you reading and typing) isn't counted, and overlapping sessions count once. The year grid and the streak use the same time.
 - **Lines written**: added lines in Claude Code's own diff of each Edit and Write. Files under `.claude/` don't count.
 - **PRs opened**: `gh pr create` runs whose output contains the PR's URL.
-- **Streak**: consecutive days, in your time zone, on which Claude worked.
-- **When you work**: the prompts you typed, by weekday and hour.
+- **Year grid and streak**: prompts you typed per day, in your time zone; a streak is consecutive days with at least one. Slash commands don't count.
+- **When you work**: the same prompts, by weekday and hour.
 - **MCP error rate**: failed calls over calls that ran. Calls you declined aren't failures.
 
 The time-range switch (All time, 90d, 30d, 7d) filters everything except the year grid, by when each session started.

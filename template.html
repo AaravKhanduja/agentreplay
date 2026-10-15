@@ -118,9 +118,14 @@ const modelName = m => m.replace(/^claude-/, '');
 
 // ---------------------------------------------------------------- stats
 
+// Two sources: every session and prompt (from prompt history, the whole
+// year) and per-transcript detail (only as far back as transcripts survive).
 function stats(key){
-  const cut = D.cutoffs[key];
+  const cut = D.cutoffs[key], cutDay = D.cutoffDays[key];
+  const all = D.allSessions.filter(([start]) => cut == null || start >= cut);
   const sessions = D.sessions.filter(s => cut == null || s.start >= cut);
+  // Detail covers only part of this range: say from when.
+  const since = D.detailSince && (cutDay == null || D.detailSince > cutDay) ? 'since ' + fmtDay(D.detailSince) : '';
   let workMs = 0;
   for (const [a, b] of D.intervals){
     if (cut != null && b <= cut) continue;
@@ -128,11 +133,12 @@ function stats(key){
   }
   const tok = [0,0,0,0], lines = [0,0], tools = {}, models = {}, mcp = {}, projects = {};
   const heat = Array.from({length:7}, () => new Array(24).fill(0));
-  let prompts = 0;
+  for (const [d, hr, n] of D.prompts){
+    if (cutDay == null || d >= cutDay) heat[(day(d).getDay() + 6) % 7][hr] += n;
+  }
   for (const s of sessions){
     s.tok.forEach((n, i) => tok[i] += n);
     lines[0] += s.lines[0]; lines[1] += s.lines[1];
-    prompts += s.prompts;
     for (const [n, c] of Object.entries(s.tools)) tools[n] = (tools[n] || 0) + c;
     for (const [m, [t, turns]] of Object.entries(s.models)){
       const e = models[m] || (models[m] = [0, 0]); e[0] += t; e[1] += turns;
@@ -140,15 +146,16 @@ function stats(key){
     for (const [srv, v] of Object.entries(s.mcp)){
       const e = mcp[srv] || (mcp[srv] = [0,0,0]); v.forEach((n, i) => e[i] += n);
     }
-    const p = projects[s.project] || (projects[s.project] = {tokens:0, sessions:0});
+    const name = D.projects[s.project];
+    const p = projects[name] || (projects[name] = {tokens:0, sessions:0});
     p.tokens += s.tok[0] + s.tok[1] + s.tok[2] + s.tok[3]; p.sessions += 1;
-    for (const [wd, hr, n] of s.heat) heat[wd][hr] += n;
   }
-  const first = sessions.length ? new Date(Math.min(...sessions.map(s => s.start))) : null;
   return {
-    key, sessions: sessions.length, workMs,
-    tokens: tok[0] + tok[1] + tok[2] + tok[3], cacheRead: tok[3], lines, prompts,
-    tools, models, mcp, heat, first,
+    key, since, workMs,
+    sessions: all.length, projectCount: new Set(all.map(([, p]) => p)).size,
+    first: all.length ? new Date(all[0][0]) : null,
+    tokens: tok[0] + tok[1] + tok[2] + tok[3], cacheRead: tok[3], lines,
+    tools, models, mcp, heat,
     projects: Object.entries(projects).sort((a, b) => b[1].tokens - a[1].tokens),
     prs: D.prs.filter(p => cut == null || p.ts >= cut),
   };
@@ -157,12 +164,15 @@ function stats(key){
 function headline(){
   const s = D.streak.longest;
   if (s && s.days > 7) return {big: s.days + '-day streak', dates: fmtDay(s.start) + ' to ' + fmtDay(s.end)};
-  return {big: plural(D.sessions.length, 'session'), dates: D.firstDay ? 'since ' + fmtDay(D.firstDay) : ''};
+  return {big: plural(D.allSessions.length, 'session'), dates: D.firstDay ? 'since ' + fmtDay(D.firstDay) : ''};
 }
+
+// "since Sep 1" appended to a label when the detail covers only part of the range.
+const within = (label, st) => st.since ? label + ' ' + st.since : label;
 
 // [text, highlighted] parts of the one sentence, shared by page and card.
 function sentence(st){
-  const projects = st.projects.length;
+  const projects = st.projectCount;
   let lead = plural(st.sessions, 'session');
   if (st.key === 'all' || st.key === 'year'){
     if (st.first){
@@ -172,7 +182,8 @@ function sentence(st){
   } else {
     lead += ' in the last ' + st.key.slice(1) + ' days';
   }
-  lead += ' across ' + plural(projects, 'project') + '. Claude worked ';
+  lead += ' across ' + plural(projects, 'project') + '. ' +
+          (st.since ? 'Since ' + fmtDay(D.detailSince) + ', Claude worked ' : 'Claude worked ');
   const worked = hours(st.workMs);
   return [[lead, false], [worked + (worked === '1' ? ' hour' : ' hours'), true], ['.', false]];
 }
@@ -183,7 +194,7 @@ function gridModel(){
   const start = day(D.grid.start);
   const cells = D.grid.levels.map((level, i) => {
     const d = new Date(start.getTime() + i * DAY);
-    return {i, col: Math.floor(i / 7), row: i % 7, level, minutes: D.grid.minutes[i], date: d};
+    return {i, col: Math.floor(i / 7), row: i % 7, level, count: D.grid.counts[i], date: d};
   });
   const months = []; let last = -1;
   cells.forEach(c => {
@@ -207,7 +218,7 @@ function yearGrid(cell, gap){
   const W = 53 * pitch - gap, H = 7 * pitch - gap;
   const box = h('div', {class:'cells', style:`width:${W}px;height:${H}px`});
   for (const c of g.cells){
-    const label = `${fmtDay(c.date.getFullYear() + '-' + (c.date.getMonth()+1) + '-' + c.date.getDate())}: ${c.minutes} active min`;
+    const label = `${fmtDay(c.date.getFullYear() + '-' + (c.date.getMonth()+1) + '-' + c.date.getDate())}: ${plural(c.count, 'prompt')}`;
     box.append(h('div', {class:'c', title: label, style:
       `left:${c.col*pitch}px;top:${c.row*pitch}px;width:${cell}px;height:${cell}px;` +
       `background:${c.level ? 'var(--accent)' : 'var(--cell)'};opacity:${c.level ? OPACITY[c.level] : 1}`}));
@@ -230,7 +241,7 @@ function bar(width, top){ return h('div', {class:'bar'}, h('i', {style:`width:${
 
 function header(){
   const right = h('div', {style:'display:flex;gap:20px;align-items:center;flex-wrap:wrap'});
-  if (D.sessions.length){
+  if (D.allSessions.length){
     right.append(
       h('div', {class:'ranges'}, Object.entries(RANGE_LABELS).map(([k, label]) =>
         h('button', {class: k === range ? 'on' : '', onclick: () => { range = k; render(); }}, label))),
@@ -246,7 +257,7 @@ function render(){
   const app = document.getElementById('app');
   app.replaceChildren();
   app.append(header());
-  if (!D.sessions.length){
+  if (!D.allSessions.length){
     app.append(h('div', {class:'empty'}, 'No Claude Code sessions found in ' + D.meta.source + '.'), footer());
     return;
   }
@@ -258,26 +269,28 @@ function render(){
     h('div', {class:'sentence'}, sentence(st).map(([t, hi]) => hi ? h('b', {}, t) : t))));
   app.append(h('div', {class:'strip'},
     stat(int(st.sessions), 'sessions'),
-    stat(compact(st.tokens), `tokens, ${pct(st.cacheRead, st.tokens)}% cache reads`),
-    stat(hours(st.workMs) + 'h', 'hours Claude worked, idle gaps removed'),
-    stat('+' + compact(st.lines[0]), 'lines written'),
-    stat(int(st.prs.length), 'PRs opened')));
+    stat(compact(st.tokens), within('tokens', st) + `, ${pct(st.cacheRead, st.tokens)}% cache reads`),
+    stat(hours(st.workMs) + 'h', within('hours Claude worked', st)),
+    stat('+' + compact(st.lines[0]), within('lines written', st)),
+    stat(int(st.prs.length), within('PRs opened', st))));
 
   const tools = Object.entries(st.tools).sort((a, b) => b[1] - a[1]).slice(0, 4);
   if (tools.length){
-    app.append(h('div', {class:'tools'}, 'Most used tools: ',
+    app.append(h('div', {class:'tools'}, within('Most used tools', st) + ': ',
       tools.map(([n, c], i) => [i ? ' · ' : '', h('b', {}, n), ' ' + compact(c)])));
   }
 
-  if (st.sessions){
+  if (st.projects.length){
     const max = st.projects[0][1].tokens || 1;
     app.append(h('div', {class:'sec'},
-      h('div', {class:'sechdr'}, h('h2', {}, 'Where the tokens went'), h('span', {}, 'by project · sessions')),
+      h('div', {class:'sechdr'}, h('h2', {}, 'Where the tokens went'), h('span', {}, within('by project · sessions', st))),
       h('div', {class:'rows'}, st.projects.slice(0, 8).map(([name, p], i) =>
         h('div', {class:'row', style:'grid-template-columns:180px minmax(0,1fr) 64px 64px'},
           h('span', {class:'name', title: name}, name), bar(100 * p.tokens / max, i === 0),
           h('span', {class:'v'}, compact(p.tokens)), h('span', {class:'v2'}, int(p.sessions)))))));
     app.append(h('div', {class:'two'}, modelsSection(st), heatSection(st)));
+  } else {
+    app.append(h('div', {class:'two'}, heatSection(st)));
   }
   const mcp = mcpSection(st); if (mcp) app.append(mcp);
   const prs = prSection(st); if (prs) app.append(prs);
@@ -293,7 +306,7 @@ function modelsSection(st){
   if (rows.length === 1) note = `Every turn ran on ${modelName(rows[0][0])}.`;
   else if (rows.length > 1) note = `${modelName(rows[0][0])} took ${pct(rows[0][1][0], total)}% of tokens on ${pct(rows[0][1][1], turns)}% of turns.`;
   return h('div', {class:'sec'},
-    h('div', {class:'sechdr'}, h('h2', {}, 'Models you ran'), h('span', {}, 'share of tokens')),
+    h('div', {class:'sechdr'}, h('h2', {}, 'Models you ran'), h('span', {}, within('share of tokens', st))),
     h('div', {class:'rows', style:'gap:12px'}, rows.slice(0, 6).map(([m, [t]], i) =>
       h('div', {class:'row', style:'grid-template-columns:150px minmax(0,1fr) 48px'},
         h('span', {class:'name', style:'font-size:13px', title: m}, modelName(m)), bar(100 * t / max, i === 0),
@@ -334,7 +347,7 @@ function mcpSection(st){
   if (!rows.length) return null;
   const worst = Math.max(...rows.map(r => r.rate || 0));
   return h('div', {class:'sec'},
-    h('div', {class:'sechdr'}, h('h2', {}, 'Top MCP servers'), h('span', {}, 'calls · error rate')),
+    h('div', {class:'sechdr'}, h('h2', {}, 'Top MCP servers'), h('span', {}, within('calls · error rate', st))),
     h('div', {class:'list'}, rows.map(r =>
       h('div', {class:'li', style:'grid-template-columns:minmax(0,1fr) 72px 56px;padding:12px 0'},
         h('span', {class:'name'}, r.name), h('span', {class:'v'}, int(r.calls)),
@@ -345,7 +358,7 @@ function mcpSection(st){
 function prSection(st){
   if (!st.prs.length) return null;
   return h('div', {class:'sec'},
-    h('div', {class:'sechdr'}, h('h2', {}, 'PRs you opened'), h('span', {}, 'from gh pr create · ' + st.prs.length)),
+    h('div', {class:'sechdr'}, h('h2', {}, 'PRs you opened'), h('span', {}, within('from gh pr create', st) + ' · ' + st.prs.length)),
     h('div', {class:'list'}, st.prs.map(p =>
       h('a', {class:'li', href: p.url, target:'_blank', rel:'noopener', style:'grid-template-columns:64px minmax(0,1fr) 160px 56px'},
         h('span', {class:'mono', style:'font-size:13px;color:var(--muted)'}, fmtDay(p.date)),
@@ -357,11 +370,14 @@ function prSection(st){
 function footer(){
   const lines = [
     `Read from ${D.meta.source} on this machine. Nothing leaves it.`,
+    D.meta.hasHistory && D.detailSince &&
+      `Sessions, projects, prompts, the grid and the streak come from your prompt history. Claude Code deletes ` +
+      `full transcripts after 30 days by default, so tokens, hours, lines, tools, models and PRs start ${fmtDay(D.detailSince)}.`,
     `Hours Claude worked count the gaps that end in Claude's reply or a tool result, dropping any gap over ${D.meta.idleGapMinutes} minutes.`,
     `Time you spend reading and typing isn't counted, and overlapping sessions count once.`,
   ];
   if (D.meta.skippedLines) lines.push(`${plural(D.meta.skippedLines, 'unreadable line')} skipped.`);
-  return h('div', {class:'foot'}, lines.map(l => h('div', {}, l)));
+  return h('div', {class:'foot'}, lines.filter(Boolean).map(l => h('div', {}, l)));
 }
 
 // ---------------------------------------------------------------- card
@@ -426,9 +442,9 @@ function drawCard(canvas){
   // Strip.
   const stripTop = 555, colW = (R - L) / 5;
   ctx.fillStyle = C.rule; ctx.fillRect(L, stripTop, R - L, 1);
-  const cells = [[int(st.sessions), 'sessions'], [hours(st.workMs) + 'h', 'hours Claude worked'],
-                 ['+' + compact(st.lines[0]), 'lines written'], [compact(st.tokens), 'tokens'],
-                 [int(st.prs.length), 'PRs opened']];
+  const cells = [[int(st.sessions), 'sessions'], [hours(st.workMs) + 'h', within('hours Claude worked', st)],
+                 ['+' + compact(st.lines[0]), within('lines written', st)], [compact(st.tokens), within('tokens', st)],
+                 [int(st.prs.length), within('PRs opened', st)]];
   cells.forEach(([n, l], i) => {
     ctx.font = `500 30px ${MONO}`; ctx.fillStyle = C.text; ctx.fillText(n, L + i * colW, stripTop + 52);
     ctx.font = `400 13px ${SANS}`; ctx.fillStyle = C.muted; ctx.fillText(l, L + i * colW, stripTop + 78);
@@ -443,7 +459,7 @@ function roundRect(ctx, x, y, w, h, r){
 
 function shareText(){
   const st = stats('year'), hl = headline();
-  return `${hl.big} with Claude Code. Claude worked ${hours(st.workMs)} hours.\n\n` +
+  return `${hl.big} with Claude Code: ${plural(st.sessions, 'session')} across ${plural(st.projectCount, 'project')}.\n\n` +
          `See yours, fully local: ${REPO}`;
 }
 
