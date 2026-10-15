@@ -4,10 +4,9 @@
 
 ## Checks
 
-- [ ] `pnpm test` passes
-- [ ] `pnpm typecheck` passes
-- [ ] `pnpm build` passes, and `agentreplay --demo` still opens a replay
-- [ ] Heuristic changes come with a fixture test in `packages/core/test/`
+- [ ] `python3 -m unittest discover tests` passes
+- [ ] `python3 agentreplay.py --demo` still opens the page and the card
+- [ ] Metric changes come with a fixture test in `tests/`
 
 ## Scope
 

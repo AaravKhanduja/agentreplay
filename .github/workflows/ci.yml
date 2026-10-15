@@ -6,51 +6,29 @@ on:
   pull_request:
 
 jobs:
-  build:
+  test:
     runs-on: ubuntu-latest
     strategy:
       matrix:
-        node: [20, 22]
+        python: ["3.9", "3.13"]
 
     steps:
       - uses: actions/checkout@v7
 
-      # No `version:` here on purpose — package.json's `packageManager` field
-      # is the single source of truth, and the action errors if both are set.
-      - uses: pnpm/action-setup@v6
-
-      - uses: actions/setup-node@v7
+      - uses: actions/setup-python@v6
         with:
-          node-version: ${{ matrix.node }}
-          cache: pnpm
+          python-version: ${{ matrix.python }}
 
-      # --frozen-lockfile is the point: it fails when package.json and
-      # pnpm-lock.yaml disagree, which is otherwise invisible until someone
-      # clones the repo for the first time.
-      - run: pnpm install --frozen-lockfile
+      - run: python -m unittest discover tests
 
-      - run: pnpm typecheck
-      - run: pnpm test
-      - run: pnpm build
+      # The pages have to actually generate, not just pass unit tests.
+      - name: Generate the demo pages
+        run: python agentreplay.py --demo --no-open --out-dir /tmp/demo
 
-      # The artifact has to actually generate, not just compile.
-      - name: Generate the demo replay
-        run: node packages/cli/dist/index.js --demo --no-ollama --out /tmp/demo.html
-
-      # The demo is a Claude Code session, so the Codex reader needs its own
-      # end-to-end run: unit tests would not catch a break between the CLI,
-      # the source registry and the generated page.
-      - name: Generate a Codex replay
+      - name: Check the pages are self-contained
         run: |
-          node packages/cli/dist/index.js \
-            packages/core/test/fixtures/codex-exec.jsonl \
-            --no-ollama --out /tmp/codex.html
-          grep -q '"agent":"codex"' /tmp/codex.html
-
-      - name: Check the artifacts are self-contained
-        run: |
-          for page in /tmp/demo.html /tmp/codex.html; do
+          for page in /tmp/demo/agentreplay.html /tmp/demo/agentreplay-card.html; do
             test -s "$page"
-            # No http(s) references: the page must work offline, forever.
-            ! grep -qE 'src="https?://|href="https?://[^"]*\.css' "$page"
+            # Nothing loads from the network: no external scripts, styles or fonts.
+            ! grep -qE '<link|src="https?://|url\(https?://' "$page"
           done
