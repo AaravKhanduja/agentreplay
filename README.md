@@ -59,7 +59,7 @@ If you'd like the detail to reach further back next year, raise `cleanupPeriodDa
 - **When you work**: the same prompts, by weekday and hour.
 - **MCP error rate**: failed calls over calls that ran. Calls you declined aren't failures.
 
-The time-range switch (All time, 90d, 30d, 7d) filters everything, including the grid and the streak; within a range, the grid's shades are relative to that range's own busiest days. The share card always shows the last 12 months.
+The time-range switch (Last 12 months, this calendar year so far, last calendar year; this year is the default) filters everything, including the grid and the streak; within a range, the grid's shades are relative to that range's own busiest days. The share card always shows the last 12 months.
 
 ## Privacy
 

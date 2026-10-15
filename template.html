@@ -106,7 +106,7 @@ const OPACITY = [0, 0.2, 0.38, 0.56, 0.78, 1.0];
 const C = {ground:'#141413',text:'#faf9f5',text2:'#d6d1c7',muted:'#9a948a',rule:'#2b2a27',cell:'#222120',accent:'#d97757'};
 const MONO = "'IBM Plex Mono', ui-monospace, monospace", SANS = "'IBM Plex Sans', system-ui, sans-serif";
 const REPO = 'https://github.com/AaravKhanduja/agentreplay';
-const RANGE_LABELS = {all:'All time', d90:'90d', d30:'30d', d7:'7d'};
+const RANGE_LABELS = Object.fromEntries(D.ranges);
 
 // ---------------------------------------------------------------- helpers
 
@@ -143,20 +143,24 @@ const modelName = m => m.replace(/^claude-/, '');
 // Two sources: every session and prompt (from prompt history, the whole
 // year) and per-transcript detail (only as far back as transcripts survive).
 function stats(key){
-  const cut = D.cutoffs[key], cutDay = D.cutoffDays[key];
-  const all = D.allSessions.filter(([start]) => cut == null || start >= cut);
-  const sessions = D.sessions.filter(s => cut == null || s.start >= cut);
-  // Detail covers only part of this range: say from when.
-  const since = D.detailSince && (cutDay == null || D.detailSince > cutDay) ? 'since ' + fmtDay(D.detailSince) : '';
+  const cut = D.cutoffs[key], end = D.ends[key], cutDay = D.cutoffDays[key], endDay = D.endDays[key];
+  const inRange = t => t >= cut && t < end;
+  const all = D.allSessions.filter(([start]) => inRange(start));
+  const sessions = D.sessions.filter(s => inRange(s.start));
+  // Detail covers only part of this range: say from when. A range that ended
+  // before the oldest transcript has no detail at all.
+  const gone = !!D.detailSince && D.detailSince > endDay;
+  const since = gone ? '(transcripts deleted)'
+    : D.detailSince && D.detailSince > cutDay ? 'since ' + fmtDay(D.detailSince) : '';
   let workMs = 0;
   for (const [a, b] of D.intervals){
-    if (cut != null && b <= cut) continue;
-    workMs += b - Math.max(a, cut == null ? a : cut);
+    if (b <= cut || a >= end) continue;
+    workMs += Math.min(b, end) - Math.max(a, cut);
   }
   const tok = [0,0,0,0], lines = [0,0], tools = {}, models = {}, mcp = {}, projects = {};
   const heat = Array.from({length:7}, () => new Array(24).fill(0));
   for (const [d, hr, n] of D.prompts){
-    if (cutDay == null || d >= cutDay) heat[(day(d).getDay() + 6) % 7][hr] += n;
+    if (d >= cutDay && d <= endDay) heat[(day(d).getDay() + 6) % 7][hr] += n;
   }
   for (const s of sessions){
     s.tok.forEach((n, i) => tok[i] += n);
@@ -173,26 +177,26 @@ function stats(key){
     p.tokens += s.tok[0] + s.tok[1] + s.tok[2] + s.tok[3]; p.sessions += 1;
   }
   return {
-    key, since, workMs,
+    key, since, gone, workMs,
     sessions: all.length, projectCount: new Set(all.map(([, p]) => p)).size,
     first: all.length ? new Date(all[0][0]) : null,
     tokens: tok[0] + tok[1] + tok[2] + tok[3], cacheRead: tok[3], lines,
     tools, models, mcp, heat,
     projects: Object.entries(projects).sort((a, b) => b[1].tokens - a[1].tokens),
-    prs: D.prs.filter(p => cut == null || p.ts >= cut),
+    prs: D.prs.filter(p => inRange(p.ts)),
   };
 }
 
-// The streak when it is worth leading with: more than a week, or for the
-// 7-day range, two days or more. Otherwise the range's session count.
+// The streak when it is worth leading with: more than a week. Otherwise the
+// range's session count.
 function headline(st){
   const s = D.streaks[st.key].longest;
-  if (s && s.days > (st.key === 'd7' ? 1 : 7)){
-    return {big: s.days + '-day streak', dates: s.days > 1 ? fmtDay(s.start) + ' to ' + fmtDay(s.end) : fmtDay(s.start)};
+  if (s && s.days > 7){
+    return {big: s.days + '-day streak', dates: fmtDay(s.start) + ' to ' + fmtDay(s.end)};
   }
-  const dates = st.key === 'all' || st.key === 'year'
+  const dates = st.key === 'year'
     ? (st.first ? 'since ' + fmtDay(D.firstDay) : '')
-    : 'in the last ' + st.key.slice(1) + ' days';
+    : 'in ' + RANGE_LABELS[st.key];
   return {big: plural(st.sessions, 'session'), dates};
 }
 
@@ -203,16 +207,18 @@ const within = (label, st) => st.since ? label + ' ' + st.since : label;
 function sentence(st){
   const projects = st.projectCount;
   let lead = plural(st.sessions, 'session');
-  if (st.key === 'all' || st.key === 'year'){
+  if (st.key === 'year'){
     if (st.first){
       const y = st.first.getFullYear() !== new Date().getFullYear() ? ' ' + st.first.getFullYear() : '';
       lead += ' since ' + MONTHS_LONG[st.first.getMonth()] + y;
     }
   } else {
-    lead += ' in the last ' + st.key.slice(1) + ' days';
+    lead += ' in ' + RANGE_LABELS[st.key];
   }
-  lead += ' across ' + plural(projects, 'project') + '. ' +
-          (st.since ? 'Since ' + fmtDay(D.detailSince) + ', Claude worked ' : 'Claude worked ');
+  lead += ' across ' + plural(projects, 'project') + '.';
+  // No transcripts survive from this range, so there are no hours to report.
+  if (st.gone) return [[lead, false]];
+  lead += ' ' + (st.since ? 'Since ' + fmtDay(D.detailSince) + ', Claude worked ' : 'Claude worked ');
   const worked = hours(st.workMs);
   return [[lead, false], [worked + (worked === '1' ? ' hour' : ' hours'), true], ['.', false]];
 }
@@ -296,7 +302,7 @@ function yearGrid(key, cell, gap){
 
 // ---------------------------------------------------------------- page
 
-let range = 'all', firstRender = true;
+let range = 'thisYear', firstRender = true;
 
 function stat(n, l){ return h('div', {class:'stat'}, h('div', {class:'n'}, n), h('div', {class:'l'}, l)); }
 function bar(width, top, i){
@@ -324,7 +330,7 @@ function header(){
   const right = h('div', {style:'display:flex;gap:20px;align-items:center;flex-wrap:wrap'});
   if (D.allSessions.length){
     right.append(
-      h('div', {class:'ranges'}, Object.entries(RANGE_LABELS).map(([k, label]) =>
+      h('div', {class:'ranges'}, D.ranges.map(([k, label]) =>
         h('button', {class: k === range ? 'on' : '', onclick: () => { range = k; render(); }}, label))),
       h('button', {class:'btn', onclick: openExport}, 'Export card'));
   }

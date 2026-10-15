@@ -30,8 +30,7 @@ DEMO_DIR = HERE / "tests" / "fixtures"
 
 # A gap between two records longer than this is idle time, not work.
 IDLE_GAP_MS = 10 * 60 * 1000
-# Ranges the page can switch between, in days. None is all time.
-RANGES = {"all": None, "d90": 90, "d30": 30, "d7": 7}
+# The rolling range: the last 12 months, also the share card's.
 GRID_DAYS = 365
 
 DECLINED_RE = re.compile(
@@ -376,9 +375,9 @@ def analyze(claude_dir, tz, now=None):
     for (day, _hour), n in history["buckets"].items():
         prompt_days[date.fromisoformat(day)] += n
 
-    starts = range_starts(prompt_days, today)
+    bounds = range_bounds(today)
+    midnight = lambda d: int(datetime.combine(d, time(), tz).timestamp() * 1000)  # noqa: E731
     prs.sort(key=lambda p: p["ts"], reverse=True)
-    origin = int(datetime.combine(today, time(), tz).timestamp() * 1000)
     detail_since = since.isoformat() if since else None
     return {
         "meta": {
@@ -391,16 +390,14 @@ def analyze(claude_dir, tz, now=None):
             "skippedLines": stats["skippedLines"],
             "idleGapMinutes": IDLE_GAP_MS // 60000,
         },
-        # Session-start cutoffs (epoch ms, local midnight) for each range;
-        # `year` is the share card's last 12 months.
-        "cutoffs": {
-            k: (None if n is None else origin - (n - 1) * 86400000)
-            for k, n in dict(RANGES, year=GRID_DAYS).items()
-        },
-        "cutoffDays": {
-            k: (None if n is None else (today - timedelta(days=n - 1)).isoformat())
-            for k, n in dict(RANGES, year=GRID_DAYS).items()
-        },
+        # [key, label] for the range switch, in order.
+        "ranges": [["year", "Last 12 months"], ["thisYear", str(today.year)], ["lastYear", str(today.year - 1)]],
+        # Each range's first and last local day, and the same as epoch ms
+        # (local midnight; `ends` is the midnight after the last day).
+        "cutoffs": {k: midnight(first) for k, (first, _) in bounds.items()},
+        "ends": {k: midnight(last + timedelta(days=1)) for k, (_, last) in bounds.items()},
+        "cutoffDays": {k: first.isoformat() for k, (first, _) in bounds.items()},
+        "endDays": {k: last.isoformat() for k, (_, last) in bounds.items()},
         "firstDay": first_day([start for start, _ in every.values()], tz),
         # The first day the surviving transcripts cover. Tokens, hours, lines,
         # tools, models, MCP and PRs are only known from here on.
@@ -410,9 +407,9 @@ def analyze(claude_dir, tz, now=None):
         "allSessions": sorted([start, index[path]] for start, path in every.values()),
         # [local date, hour, prompts you typed].
         "prompts": [[d, h, n] for (d, h), n in sorted(history["buckets"].items())],
-        # The grid and streak for each range, plus `year` for the card.
-        "grids": {k: year_grid(prompt_days, today, d) for k, d in starts.items()},
-        "streaks": {k: streaks(prompt_days, today, d) for k, d in starts.items()},
+        # The grid and streak for each range; the card always uses `year`.
+        "grids": {k: year_grid(prompt_days, last, first) for k, (first, last) in bounds.items()},
+        "streaks": {k: streaks(prompt_days, last, first) for k, (first, last) in bounds.items()},
         # Per-transcript detail rows.
         "sessions": [strip_row(r) for r in rows],
         # [start ms, end ms] of Claude's working time, disjoint and sorted.
@@ -552,23 +549,22 @@ def union(spans):
     return merged
 
 
-def range_starts(days, today):
-    """First day of each range. All time reaches back at least 12 months so
-    the grid keeps its shape; `year` is the share card's last 12 months."""
-    year = today - timedelta(days=GRID_DAYS - 1)
-    starts = {"all": min([year] + list(days)), "year": year}
-    for key, n in RANGES.items():
-        if n is not None:
-            starts[key] = today - timedelta(days=n - 1)
-    return starts
+def range_bounds(today):
+    """(first, last) day of each range: the last 12 months (also the share
+    card's), this calendar year so far, and all of last calendar year."""
+    return {
+        "year": (today - timedelta(days=GRID_DAYS - 1), today),
+        "thisYear": (date(today.year, 1, 1), today),
+        "lastYear": (date(today.year - 1, 1, 1), date(today.year - 1, 12, 31)),
+    }
 
 
-def year_grid(days, today, first):
-    """Weeks from `first` to today, Monday first, with quantile levels 1-5 of
+def year_grid(days, last, first):
+    """Weeks from `first` to `last`, Monday first, with quantile levels 1-5 of
     each day's count (prompts you typed) within the range. 0 is a quiet day,
     -1 a day before the range that only fills out its first week."""
     start = first - timedelta(days=first.weekday())
-    count = (today - start).days + 1
+    count = (last - start).days + 1
     values = [days.get(start + timedelta(days=i), 0) for i in range(count)]
     lead = (first - start).days
     active = sorted(v for v in values[lead:] if v > 0)
@@ -583,7 +579,8 @@ def year_grid(days, today, first):
 
 
 def streaks(days, today, first):
-    """Longest run of active days between `first` and today, and the current run."""
+    """Longest run of active days between `first` and `today` (the range's last
+    day), and the run still going on that day."""
     active = sorted(d for d, m in days.items() if m > 0 and first <= d <= today)
     best, run_start, prev = None, None, None
     for d in active:

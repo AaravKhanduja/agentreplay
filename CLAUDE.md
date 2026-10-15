@@ -50,7 +50,7 @@ python3 agentreplay.py --json                                 # real stats as JS
 - IBM Plex Mono for numbers and labels, Plex Sans for sentences. Second-person voice.
 - No gradients, icons, emoji, or lowercase-everything.
 - Motion is CSS only and short: the grid sweeps in, sections rise, bars grow, numbers count up; hovering the grid lifts a cell and dims the rest. All of it is off under `prefers-reduced-motion`, and the card has none.
-- The grid and streak follow the range switch (`grids`/`streaks` per range in the payload). Shades are quantile levels within that range, and the longest streak is outlined. All time reaches back at least 12 months; the card always uses `year`.
+- The grid and streak follow the range switch (`grids`/`streaks` per range in the payload). Shades are quantile levels within that range, and the longest streak is outlined. The switch is the last 12 months (`year`), this calendar year so far (`thisYear`, the default) and last calendar year (`lastYear`); the card always uses `year`.
 
 ## Out of scope for v1
 

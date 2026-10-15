@@ -42,7 +42,7 @@ Second person. "You spent 106 hours directing it." Never first person. Never "yo
 - Color metric is active minutes per day. Zero days use `track-cell`. Non-zero days use accent at one of five opacities `[0.2, 0.38, 0.56, 0.78, 1.0]`, levels assigned by quantiles (20/40/60/80th percentile of non-zero days), not linear.
 - Longest streak gets one rounded 1.5px accent outline around its weeks (bounding box, not per-cell).
 - Month labels sit in a 16px row above the grid, absolutely positioned at the first column of each month; skip a label if the first month has fewer than 5 days in the grid.
-- Grid is always 12 months regardless of the time-range control.
+- On the page the grid follows the time-range control (Mon/Wed/Fri labels on the left); the card's grid is always the last 12 months.
 
 ## Card layout (1200x675, padding 44/44/40)
 
@@ -56,7 +56,7 @@ Second person. "You spent 106 hours directing it." Never first person. Never "yo
 
 ## Overview page layout (max-width 1040, padding 40/16/80, section gap 52)
 
-1. Header: mark + `agentreplay overview` (left); time range switch `All time / 90d / 30d / 7d` (All time default, 1px rule border, selected = ivory bg + ground text) and `Export card` (right).
+1. Header: mark + `agentreplay overview` (left); time range switch `Last 12 months / 2026 / 2025` (the current year default, 1px rule border, selected = ivory bg + ground text) and `Export card` (right).
 2. Year grid (same as card, smaller cells).
 3. Streak headline 64px + dates, sentence with accent hour figures.
 4. Strip (1px rules top and bottom): sessions, tokens (label "tokens, 91% cache reads"), active hours (label "active hours, idle gaps removed"), lines written, PRs opened.
@@ -67,7 +67,7 @@ Second person. "You spent 106 hours directing it." Never first person. Never "yo
 9. `PRs you opened`: date, title, repo, number. Each row a link. Header shows source and count.
 10. Footer, 12px faint: data source, idle-gap rule.
 
-Time range filters the sentence, strip and all sections except the grid. Filter at session level by first timestamp.
+Time range filters the grid, sentence, strip and all sections. Filter at session level by first timestamp.
 
 ## Metrics definitions (state these in the footer or a tooltip)
 

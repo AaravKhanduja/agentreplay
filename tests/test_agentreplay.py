@@ -94,12 +94,25 @@ class FixtureTest(unittest.TestCase):
 
     def test_streak_from_history(self):
         self.assertEqual(
-            self.payload["streaks"]["all"],
+            self.payload["streaks"]["thisYear"],
             {"longest": {"start": "2026-06-01", "end": "2026-06-02", "days": 2}, "current": 0},
         )
-        # The June streak is outside the last 30 days; Oct 10 is inside.
-        self.assertEqual(self.payload["streaks"]["d30"]["longest"]["start"], "2026-10-10")
-        self.assertEqual(self.payload["streaks"]["d7"]["longest"]["days"], 1)
+        self.assertEqual(self.payload["streaks"]["year"], self.payload["streaks"]["thisYear"])
+        # Nothing in the fixtures falls in 2025.
+        self.assertIsNone(self.payload["streaks"]["lastYear"]["longest"])
+
+    def test_ranges(self):
+        self.assertEqual(self.payload["ranges"], [["year", "Last 12 months"], ["thisYear", "2026"], ["lastYear", "2025"]])
+        self.assertEqual(self.payload["cutoffDays"]["thisYear"], "2026-01-01")
+        self.assertEqual(self.payload["endDays"]["thisYear"], "2026-10-15")
+        self.assertEqual(self.payload["cutoffDays"]["lastYear"], "2025-01-01")
+        self.assertEqual(self.payload["endDays"]["lastYear"], "2025-12-31")
+        self.assertEqual(self.payload["ends"]["lastYear"], self.payload["cutoffs"]["thisYear"])
+        # Last year's grid runs Monday Dec 30 2024 through Dec 31 2025.
+        grid = self.payload["grids"]["lastYear"]
+        self.assertEqual(grid["start"], "2024-12-30")
+        self.assertEqual(len(grid["levels"]), 367)
+        self.assertEqual(grid["levels"][:3], [-1, -1, 0])
 
 
 class NoHistoryTest(unittest.TestCase):
@@ -157,7 +170,7 @@ class UnitTest(unittest.TestCase):
         with tempfile.TemporaryDirectory() as tmp:
             payload = ar.analyze(Path(tmp), timezone.utc, now=NOW)
         self.assertEqual(payload["sessions"], [])
-        self.assertEqual(payload["streaks"]["all"], {"longest": None, "current": 0})
+        self.assertEqual(payload["streaks"]["thisYear"], {"longest": None, "current": 0})
 
 
 class RenderTest(unittest.TestCase):
