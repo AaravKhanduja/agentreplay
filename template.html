@@ -27,12 +27,12 @@ button{font:inherit}
 .months span{position:absolute;top:0}
 .grid{position:relative;max-width:100%;overflow-x:auto;padding:5px;margin:-5px}
 .grid .cells{position:relative}
-.grid .c{position:absolute;border-radius:2px;opacity:var(--o);transition:transform .15s ease,filter .2s ease,box-shadow .15s ease;animation:pop .45s cubic-bezier(.2,.7,.2,1) backwards}
+.grid .c{position:absolute;border-radius:2px;opacity:var(--o);transition:transform .15s ease,filter .2s ease,box-shadow .15s ease;animation:pop .75s cubic-bezier(.33,0,.2,1) backwards}
 .grid .cells:hover .c{filter:brightness(.5)}
 .grid .cells .c:hover{filter:none;transform:scale(1.5);box-shadow:0 0 0 1.5px var(--text);z-index:2}
 .tip{position:fixed;z-index:12;pointer-events:none;background:#2b2a27;color:var(--text);font-size:13px;line-height:1;padding:8px 10px;border-radius:4px;white-space:nowrap;transform:translate(-50%,-100%);opacity:0;transition:opacity .12s ease,left .1s ease,top .1s ease}
 .tip.on{opacity:1}
-.streakbox{position:absolute;border:1.5px solid var(--accent);border-radius:5px;pointer-events:none;animation:fade .5s ease .6s backwards}
+.streakbox{position:absolute;border:1.5px solid var(--accent);border-radius:5px;pointer-events:none;animation:fade .8s ease 1.3s backwards}
 .headline{display:flex;align-items:baseline;gap:18px;flex-wrap:wrap}
 .headline .big{font-family:var(--mono);font-size:64px;line-height:1;font-weight:500;letter-spacing:-0.03em;color:var(--accent)}
 .headline .dates{font-family:var(--mono);font-size:15px;color:var(--muted)}
@@ -50,7 +50,7 @@ h2{margin:0;font-size:18px;font-weight:600}
 .rows{display:flex;flex-direction:column;gap:14px}
 .row{display:grid;gap:16px;align-items:center}
 .row .name{font-family:var(--mono);font-size:14px;color:var(--text2);overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
-.bar{height:14px;background:var(--track)}.bar i{display:block;height:100%;transform-origin:left;animation:grow .8s cubic-bezier(.2,.7,.2,1) backwards}
+.bar{height:14px;background:var(--track)}.bar i{display:block;height:100%;transform-origin:left;animation:grow 1.3s cubic-bezier(.33,0,.2,1) backwards}
 .row .v{font-family:var(--mono);font-size:14px;color:var(--text);text-align:right}
 .row .v2{font-family:var(--mono);font-size:14px;color:var(--muted);text-align:right}
 .two{display:grid;grid-template-columns:repeat(auto-fit,minmax(300px,1fr));gap:40px 48px}
@@ -82,8 +82,8 @@ a.li:hover{background:var(--track)}
 @keyframes fade{from{opacity:0}}
 @keyframes rise{from{opacity:0;transform:translateY(10px)}}
 @keyframes grow{from{transform:scaleX(0)}}
-.intro>*{animation:rise .6s cubic-bezier(.2,.7,.2,1) backwards}
-.swap>:not(.hdr){animation:fade .3s ease backwards}
+.intro>*{animation:rise 1s cubic-bezier(.33,0,.2,1) backwards}
+.swap>:not(.hdr){animation:fade .5s ease backwards}
 @media (prefers-reduced-motion:reduce){*,*::before,*::after{animation:none!important;transition:none!important}}
 body.card{width:1200px;height:675px;overflow:hidden}
 body.card canvas{display:block;width:1200px;height:675px}
@@ -264,7 +264,7 @@ function yearGrid(key, cell, gap){
     box.append(h('div', {class:'c', 'data-tip': dayTip(c.count, c.date), style:
       `left:${c.col*pitch}px;top:${c.row*pitch}px;width:${cell}px;height:${cell}px;` +
       `background:${c.level ? 'var(--accent)' : 'var(--cell)'};--o:${c.level ? OPACITY[c.level] : 1};` +
-      `animation-delay:${c.col * 10 + c.row * 15}ms`}));
+      `animation-delay:${c.col * 18 + c.row * 25}ms`}));
   }
   if (g.streak){
     box.append(h('div', {class:'streakbox', style:
@@ -294,7 +294,7 @@ let range = 'all', firstRender = true;
 
 function stat(n, l){ return h('div', {class:'stat'}, h('div', {class:'n'}, n), h('div', {class:'l'}, l)); }
 function bar(width, top, i){
-  return h('div', {class:'bar'}, h('i', {style:`width:${width}%;background:${top ? 'var(--accent)' : 'var(--bar2)'};animation-delay:${200 + 50 * i}ms`}));
+  return h('div', {class:'bar'}, h('i', {style:`width:${width}%;background:${top ? 'var(--accent)' : 'var(--bar2)'};animation-delay:${400 + 90 * i}ms`}));
 }
 
 // Count the first number in an element's text up from zero, keeping its format ("101M", "+14.2k", "48-day streak").
@@ -303,9 +303,9 @@ function countUp(el){
   const text = el.textContent, m = text.match(/^(\D*?)(\d[\d,]*(?:\.\d+)?)(.*)$/s);
   if (!MOTION || !m) return;
   const target = parseFloat(m[2].replace(/,/g, '')), dec = (m[2].split('.')[1] || '').length, commas = m[2].includes(',');
-  const t0 = performance.now(), dur = 900;
+  const t0 = performance.now(), dur = 1500;
   const step = now => {
-    const t = Math.min(1, (now - t0) / dur), v = target * (1 - Math.pow(1 - t, 3));
+    const t = Math.min(1, (now - t0) / dur), v = target * (t < .5 ? 4 * t * t * t : 1 - Math.pow(2 - 2 * t, 3) / 2);
     if (t >= 1) { el.textContent = text; return; }
     const n = commas ? Math.round(v).toLocaleString('en-US') : v.toFixed(dec);
     el.textContent = m[1] + n + m[3];
@@ -374,7 +374,7 @@ function render(){
 
   // Sections rise in one after another on load; a range switch just fades the new numbers in.
   app.className = 'wrap ' + (firstRender ? 'intro' : 'swap');
-  if (firstRender) [...app.children].forEach((el, i) => { el.style.animationDelay = (i * 70) + 'ms'; });
+  if (firstRender) [...app.children].forEach((el, i) => { el.style.animationDelay = (i * 120) + 'ms'; });
   firstRender = false;
   app.querySelectorAll('.headline .big, .stat .n').forEach(countUp);
 }
