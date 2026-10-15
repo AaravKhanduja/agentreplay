@@ -22,6 +22,8 @@ button{font:inherit}
 .ranges button.on{background:var(--text);color:var(--ground)}
 .btn{font-family:var(--mono);font-size:13px;border:1px solid var(--line);background:transparent;padding:8px 14px;color:var(--text);min-height:28px;display:inline-flex;align-items:center;cursor:pointer}
 .btn:hover{border-color:var(--muted)}
+.btn.share{background:var(--accent);border-color:var(--accent);color:var(--ground);font-weight:500;padding:8px 20px}
+.btn.share:hover{border-color:var(--accent);filter:brightness(1.1)}
 .btn:focus-visible,.ranges button:focus-visible{outline:1px solid var(--muted);outline-offset:2px}
 .months{position:relative;height:16px;font-family:var(--mono);font-size:12px;color:var(--muted)}
 .months span{position:absolute;top:0}
@@ -332,7 +334,7 @@ function header(){
     right.append(
       h('div', {class:'ranges'}, D.ranges.map(([k, label]) =>
         h('button', {class: k === range ? 'on' : '', onclick: () => { range = k; render(); }}, label))),
-      h('button', {class:'btn', onclick: openExport}, 'Export card'));
+      h('button', {class:'btn share', onclick: openExport}, 'Share'));
   }
   return h('div', {class:'hdr'},
     h('div', {style:'display:flex;align-items:center;gap:12px'},

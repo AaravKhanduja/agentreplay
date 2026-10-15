@@ -45,7 +45,7 @@ python3 agentreplay.py --json                                 # real stats as JS
 ## Design (see design/DESIGN.md)
 
 - Ground `#141413`, text `#faf9f5`, accent clay `#d97757`.
-  - The accent appears at most 3–4 times per screen: one bar per chart, the headline, the hour figures, the grid.
+  - The accent appears at most 3–4 times per screen: one bar per chart, the headline, the hour figures, the grid, and the Share button.
   - Cyan `#7cc4d6` is only for failure numbers (the MCP error rate).
 - IBM Plex Mono for numbers and labels, Plex Sans for sentences. Second-person voice.
 - No gradients, icons, emoji, or lowercase-everything.

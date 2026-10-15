@@ -37,7 +37,7 @@ That writes `agentreplay.html` and `agentreplay-card.html` to the current direct
 
 ## Sharing the card
 
-On the overview, **Export card** shows the card. **Post on X** copies the card to your clipboard and opens X's composer in a popup with your headline stat filled in; the page tells you to press ⌘V (Ctrl+V) in the post to attach the card. X's post link can only carry text, and uploading the image for you would mean sending it somewhere, so the card travels by clipboard. **Copy image** and **Download PNG** are there if you're posting somewhere else. `agentreplay-card.html` is the same card as a page.
+On the overview, **Share** shows the card. **Post on X** copies the card to your clipboard and opens X's composer in a popup with your headline stat filled in; the page tells you to press ⌘V (Ctrl+V) in the post to attach the card. X's post link can only carry text, and uploading the image for you would mean sending it somewhere, so the card travels by clipboard. **Copy image** and **Download PNG** are there if you're posting somewhere else. `agentreplay-card.html` is the same card as a page.
 
 ## What the numbers mean
 

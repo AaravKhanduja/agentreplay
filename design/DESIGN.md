@@ -56,7 +56,7 @@ Second person. "You spent 106 hours directing it." Never first person. Never "yo
 
 ## Overview page layout (max-width 1040, padding 40/16/80, section gap 52)
 
-1. Header: mark + `agentreplay overview` (left); time range switch `Last 12 months / 2026 / 2025` (the current year default, 1px rule border, selected = ivory bg + ground text) and `Export card` (right).
+1. Header: mark + `agentreplay overview` (left); time range switch `Last 12 months / 2026 / 2025` (the current year default, 1px rule border, selected = ivory bg + ground text) and `Share` (right; solid accent fill, ground text, the page's one filled button).
 2. Year grid (same as card, smaller cells).
 3. Streak headline 64px + dates, sentence with accent hour figures.
 4. Strip (1px rules top and bottom): sessions, tokens (label "tokens, 91% cache reads"), active hours (label "active hours, idle gaps removed"), lines written, PRs opened.
