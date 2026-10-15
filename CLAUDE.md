@@ -25,8 +25,8 @@ python3 agentreplay.py --json                                 # real stats as JS
 - **A human prompt is a typed one.** Exclude tool-result carriers (`type: user` with `tool_result` content), `isMeta`, sidechains, compact summaries, `<command-name>` and `<local-command` wrappers, `[Request interrupted`, and anything whose `origin.kind` isn't `human` (task notifications).
 - **Time.**
   - Gaps between consecutive user/assistant records count only up to 10 minutes (`IDLE_GAP_MS`).
-  - A gap is Claude's if it ends in an assistant record, a tool result, a subagent record or a machine message, and yours if it ends in your prompt.
-  - Intervals are unioned across sessions, and Claude's time wins an overlap, so agent + you = active.
+  - Only Claude's working time counts: a gap that ends in an assistant record, a tool result, a subagent record or a machine message (`ends_claude_work`). A gap that ends in your prompt is you reading and typing, and is not shown anywhere.
+  - Intervals are unioned across sessions. The grid, the streak and every hour figure use this one measure.
 - **Lines come from `toolUseResult.structuredPatch`.** A Write that creates a file counts its content. Fall back to the input's string newlines only when no patch exists. `.claude/` paths are the harness's, not the user's.
 - **A declined call is not an error** (`DECLINED_RE`).
 - **A PR counts only when its URL appears in the result.**

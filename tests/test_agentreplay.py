@@ -15,8 +15,7 @@ NOW = datetime(2026, 10, 15, 12, 0, tzinfo=timezone.utc)
 
 def totals(payload):
     rows = payload["sessions"]
-    agent = sum(b - a for a, b, k in payload["intervals"] if k == 1)
-    you = sum(b - a for a, b, k in payload["intervals"] if k == 0)
+    worked = sum(b - a for a, b in payload["intervals"])
     tools, mcp = {}, {}
     for r in rows:
         for name, n in r["tools"].items():
@@ -27,8 +26,7 @@ def totals(payload):
         "prompts": sum(r["prompts"] for r in rows),
         "tok": [sum(r["tok"][i] for r in rows) for i in range(4)],
         "lines": [sum(r["lines"][i] for r in rows) for i in range(2)],
-        "agent_s": agent / 1000,
-        "you_s": you / 1000,
+        "worked_s": worked / 1000,
         "tools": tools,
         "mcp": mcp,
     }
@@ -74,11 +72,11 @@ class FixtureTest(unittest.TestCase):
         self.assertEqual(prs[0]["repo"], "acme/shop")
         self.assertEqual(prs[0]["number"], 42)
 
-    def test_agent_and_you_time(self):
-        # 14:00-14:15 and 14:16-14:17 and 14:28-14:29 are Claude's; the
-        # 11-minute gap is idle; blog's overlapping time is already covered.
-        self.assertEqual(self.t["agent_s"], 1020)
-        self.assertEqual(self.t["you_s"], 60)
+    def test_claude_working_time(self):
+        # 14:00-14:15, 14:16-14:17 and 14:28-14:29 are Claude's. The gaps
+        # ending in /clear and the meta line are you, the 11-minute gap is
+        # idle, and blog's overlapping time is already covered.
+        self.assertEqual(self.t["worked_s"], 1020)
 
     def test_bad_lines_counted(self):
         self.assertEqual(self.payload["meta"]["skippedLines"], 2)
@@ -91,13 +89,12 @@ class FixtureTest(unittest.TestCase):
 
 
 class UnitTest(unittest.TestCase):
-    def test_split_time_agent_wins_overlap(self):
-        out = ar.split_time([(10, 20)], [(0, 30)])
-        self.assertEqual(out, [(0, 10, "you"), (10, 20, "agent"), (20, 30, "you")])
+    def test_union_merges_overlaps(self):
+        self.assertEqual(ar.union([(10, 20), (0, 12), (30, 40)]), [[0, 20], [30, 40]])
 
     def test_minutes_split_at_local_midnight(self):
         start = datetime(2026, 3, 1, 23, 50, tzinfo=timezone.utc).timestamp() * 1000
-        days = ar.active_minutes_by_day([(start, start + 20 * 60000, "agent")], timezone.utc)
+        days = ar.active_minutes_by_day([(start, start + 20 * 60000)], timezone.utc)
         self.assertEqual(days, {date(2026, 3, 1): 10, date(2026, 3, 2): 10})
 
     def test_streaks(self):

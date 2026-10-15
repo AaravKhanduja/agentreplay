@@ -2,7 +2,7 @@
 
 [![CI](https://github.com/AaravKhanduja/agentreplay/actions/workflows/ci.yml/badge.svg)](https://github.com/AaravKhanduja/agentreplay/actions/workflows/ci.yml)
 
-AgentReplay reads the session logs Claude Code keeps in `~/.claude` and shows you how you work with it: a year of activity, your longest streak, how many hours Claude worked and how many you spent directing it, where the tokens went, which models you ran, when you work, and the PRs you opened. It writes two files: an overview page and a 1200×675 card you can post.
+AgentReplay reads the session logs Claude Code keeps in `~/.claude` and shows you how you work with it: a year of activity, your longest streak, how many hours Claude spent working, where the tokens went, which models you ran, when you work, and the PRs you opened. It writes two files: an overview page and a 1200×675 card you can post.
 
 One Python file, no dependencies, nothing leaves your machine.
 
@@ -35,11 +35,10 @@ Every number is counted from the logs. Nothing is estimated, inferred or written
 
 - **Sessions**: session files under `~/.claude/projects`, with their subagent files folded in.
 - **Tokens**: `input + output + cache write + cache read`, counted once per message. Claude Code writes one response across several lines, and a resumed session copies earlier messages, so tokens are deduplicated by message id.
-- **Active hours**: the gaps between consecutive messages, dropping any gap over 10 minutes. Sessions that overlap count once.
-- **Claude worked / you directed**: a counted gap is Claude's time if it ends in Claude's reply or a tool result, and yours if it ends in a prompt you typed. Where sessions overlap, Claude's time wins, so the two always add up to active hours.
+- **Hours Claude worked**: the gaps between consecutive messages that end in Claude's reply or a tool result, which is Claude thinking, writing, or running a tool. Any gap over 10 minutes is dropped as idle, a gap that ends in your prompt (you reading and typing) isn't counted, and overlapping sessions count once. The year grid and the streak use the same time.
 - **Lines written**: added lines in Claude Code's own diff of each Edit and Write. Files under `.claude/` don't count.
 - **PRs opened**: `gh pr create` runs whose output contains the PR's URL.
-- **Streak**: consecutive days, in your time zone, with any active time.
+- **Streak**: consecutive days, in your time zone, on which Claude worked.
 - **When you work**: the prompts you typed, by weekday and hour.
 - **MCP error rate**: failed calls over calls that ran. Calls you declined aren't failures.
 

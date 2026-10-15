@@ -10,7 +10,6 @@ card. Standard library only. Nothing leaves the machine.
 
 import argparse
 import base64
-import bisect
 import json
 import os
 import re
@@ -158,16 +157,17 @@ def is_human_prompt(record):
     return not text.startswith(("<command-name>", "<command-message>", "<local-command"))
 
 
-def gap_kind(record):
-    """Who a gap ending in this record belongs to: 'agent', 'you', or None."""
+def ends_claude_work(record):
+    """Whether the gap before this record was Claude working: it ends in
+    Claude's reply, a tool result, or a subagent's record. A gap that ends
+    in your prompt was you reading and typing, so it doesn't count. None
+    for records that aren't part of the conversation."""
     kind = record.get("type")
     if kind == "assistant":
-        return "agent"
+        return True
     if kind != "user":
         return None
-    if record.get("isSidechain") or tool_results(record) or is_machine_message(record):
-        return "agent"
-    return "you"
+    return bool(record.get("isSidechain") or tool_results(record) or is_machine_message(record))
 
 
 def count_lines(text):
@@ -266,7 +266,7 @@ def analyze(projects_dir, tz, now=None):
     seen_messages = set()
     seen_tools = set()
     calls = {}  # tool_use id -> (name, input, row)
-    agent_spans, you_spans = [], []
+    spans = []
     rows, prs = [], []
 
     for session in sessions:
@@ -298,19 +298,20 @@ def analyze(projects_dir, tz, now=None):
 
         last = None
         for record in timeline:
-            kind = gap_kind(record)
-            if kind is None:
+            working = ends_claude_work(record)
+            if working is None:
                 continue
             ts = record["_ts"]
-            if last is not None and 0 < ts - last <= IDLE_GAP_MS:
-                (agent_spans if kind == "agent" else you_spans).append((last, ts))
+            if working and last is not None and 0 < ts - last <= IDLE_GAP_MS:
+                spans.append((last, ts))
             last = ts
 
         row["tools"] = dict(row["tools"])
         row["heat"] = [[wd, h, n] for (wd, h), n in sorted(row["heat"].items())]
         rows.append(row)
 
-    intervals = split_time(agent_spans, you_spans)
+    # Overlapping sessions count once.
+    intervals = union(spans)
     days = active_minutes_by_day(intervals, tz)
     names = disambiguate([r["project"] for r in rows])
     for r, name in zip(rows, names):
@@ -340,8 +341,8 @@ def analyze(projects_dir, tz, now=None):
         "grid": grid,
         "streak": streaks(days, today),
         "sessions": [strip_row(r) for r in rows],
-        # [start ms, end ms, 1 = Claude's time / 0 = yours], disjoint and sorted.
-        "intervals": [[a, b, 1 if k == "agent" else 0] for a, b, k in intervals],
+        # [start ms, end ms] of Claude's working time, disjoint and sorted.
+        "intervals": intervals,
         "prs": prs,
     }
 
@@ -479,32 +480,10 @@ def union(spans):
     return merged
 
 
-def split_time(agent_spans, you_spans):
-    """Disjoint (start, end, kind) intervals. Claude's time wins an overlap,
-    so Claude's hours plus yours always equal active hours."""
-    agent = union(agent_spans)
-    starts = [a for a, _ in agent]
-    out = [(a, b, "agent") for a, b in agent]
-    for a, b in union(you_spans):
-        i = max(bisect.bisect_right(starts, a) - 1, 0)
-        cursor = a
-        while i < len(agent) and agent[i][0] < b:
-            s, e = agent[i]
-            if e > cursor:
-                if s > cursor:
-                    out.append((cursor, s, "you"))
-                cursor = max(cursor, e)
-            i += 1
-        if cursor < b:
-            out.append((cursor, b, "you"))
-    out.sort()
-    return out
-
-
 def active_minutes_by_day(intervals, tz):
-    """Local date -> active minutes, splitting intervals at local midnight."""
+    """Local date -> minutes Claude worked, splitting intervals at local midnight."""
     days = defaultdict(float)
-    for a, b, _ in intervals:
+    for a, b in intervals:
         start = datetime.fromtimestamp(a / 1000, tz)
         end = datetime.fromtimestamp(b / 1000, tz)
         while start.date() < end.date():
