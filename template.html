@@ -28,6 +28,7 @@ button{font:inherit}
 .grid{position:relative;max-width:100%;overflow-x:auto;padding:5px;margin:-5px}
 .grid .cells{position:relative}
 .grid .c{position:absolute;border-radius:2px}
+.tip{position:fixed;z-index:12;pointer-events:none;background:#2b2a27;color:var(--text);font-size:13px;line-height:1;padding:8px 10px;border-radius:4px;white-space:nowrap;transform:translate(-50%,-100%);display:none}
 .streakbox{position:absolute;border:1.5px solid var(--accent);border-radius:5px;pointer-events:none}
 .headline{display:flex;align-items:baseline;gap:18px;flex-wrap:wrap}
 .headline .big{font-family:var(--mono);font-size:64px;line-height:1;font-weight:500;letter-spacing:-0.03em;color:var(--accent)}
@@ -229,13 +230,26 @@ function gridModel(key){
   return {cells, months, streak, cols};
 }
 
+// "6 prompts on September 28th." in GitHub's phrasing.
+function ordinal(n){
+  const t = n % 100;
+  if (t >= 11 && t <= 13) return n + 'th';
+  return n + ({1:'st', 2:'nd', 3:'rd'}[n % 10] || 'th');
+}
+function dayTip(count, date){
+  const when = MONTHS_LONG[date.getMonth()] + ' ' + ordinal(date.getDate());
+  return (count ? plural(count, 'prompt') : 'No prompts') + ' on ' + when + '.';
+}
+const tip = h('div', {class:'tip'});
+const hideTip = () => { tip.style.display = 'none'; };
+window.addEventListener('scroll', hideTip, true);
+
 function yearGrid(key, cell, gap){
   const pitch = cell + gap, g = gridModel(key);
   const W = g.cols * pitch - gap, H = 7 * pitch - gap;
   const box = h('div', {class:'cells', style:`width:${W}px;height:${H}px`});
   for (const c of g.cells){
-    const label = `${fmtDay(c.date.getFullYear() + '-' + (c.date.getMonth()+1) + '-' + c.date.getDate())}: ${plural(c.count, 'prompt')}`;
-    box.append(h('div', {class:'c', title: label, style:
+    box.append(h('div', {class:'c', 'data-tip': dayTip(c.count, c.date), style:
       `left:${c.col*pitch}px;top:${c.row*pitch}px;width:${cell}px;height:${cell}px;` +
       `background:${c.level ? 'var(--accent)' : 'var(--cell)'};opacity:${c.level ? OPACITY[c.level] : 1}`}));
   }
@@ -243,6 +257,17 @@ function yearGrid(key, cell, gap){
     box.append(h('div', {class:'streakbox', style:
       `left:${g.streak.c0*pitch-4}px;top:-4px;width:${(g.streak.c1-g.streak.c0+1)*pitch-gap+8}px;height:${H+8}px`}));
   }
+  // One tooltip for the whole grid, placed just above whichever cell is hovered.
+  box.onmouseover = e => {
+    const text = e.target.dataset && e.target.dataset.tip;
+    if (!text) return hideTip();
+    const r = e.target.getBoundingClientRect();
+    tip.textContent = text;
+    tip.style.left = (r.left + r.width / 2) + 'px';
+    tip.style.top = (r.top - 6) + 'px';
+    tip.style.display = 'block';
+  };
+  box.onmouseleave = hideTip;
   const months = h('div', {class:'months', style:`width:${W}px`},
     g.months.map(m => h('span', {style:`left:${m.col*pitch}px`}, m.name)));
   return h('div', {style:'display:flex;flex-direction:column;gap:8px'}, months, h('div', {class:'grid'}, box));
@@ -271,6 +296,7 @@ function header(){
 
 function render(){
   const app = document.getElementById('app');
+  hideTip();
   app.replaceChildren();
   app.append(header());
   if (!D.allSessions.length){
@@ -560,6 +586,7 @@ if (D.mode === 'card'){
   document.getElementById('app').replaceWith(canvas);
   fontsReady().then(() => drawCard(canvas));
 } else {
+  document.body.append(tip);
   render();
 }
 </script>
