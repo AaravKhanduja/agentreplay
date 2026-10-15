@@ -27,9 +27,12 @@ button{font:inherit}
 .months span{position:absolute;top:0}
 .grid{position:relative;max-width:100%;overflow-x:auto;padding:5px;margin:-5px}
 .grid .cells{position:relative}
-.grid .c{position:absolute;border-radius:2px}
-.tip{position:fixed;z-index:12;pointer-events:none;background:#2b2a27;color:var(--text);font-size:13px;line-height:1;padding:8px 10px;border-radius:4px;white-space:nowrap;transform:translate(-50%,-100%);display:none}
-.streakbox{position:absolute;border:1.5px solid var(--accent);border-radius:5px;pointer-events:none}
+.grid .c{position:absolute;border-radius:2px;opacity:var(--o);transition:transform .15s ease,filter .2s ease,box-shadow .15s ease;animation:pop .45s cubic-bezier(.2,.7,.2,1) backwards}
+.grid .cells:hover .c{filter:brightness(.5)}
+.grid .cells .c:hover{filter:none;transform:scale(1.5);box-shadow:0 0 0 1.5px var(--text);z-index:2}
+.tip{position:fixed;z-index:12;pointer-events:none;background:#2b2a27;color:var(--text);font-size:13px;line-height:1;padding:8px 10px;border-radius:4px;white-space:nowrap;transform:translate(-50%,-100%);opacity:0;transition:opacity .12s ease,left .1s ease,top .1s ease}
+.tip.on{opacity:1}
+.streakbox{position:absolute;border:1.5px solid var(--accent);border-radius:5px;pointer-events:none;animation:fade .5s ease .6s backwards}
 .headline{display:flex;align-items:baseline;gap:18px;flex-wrap:wrap}
 .headline .big{font-family:var(--mono);font-size:64px;line-height:1;font-weight:500;letter-spacing:-0.03em;color:var(--accent)}
 .headline .dates{font-family:var(--mono);font-size:15px;color:var(--muted)}
@@ -47,7 +50,7 @@ h2{margin:0;font-size:18px;font-weight:600}
 .rows{display:flex;flex-direction:column;gap:14px}
 .row{display:grid;gap:16px;align-items:center}
 .row .name{font-family:var(--mono);font-size:14px;color:var(--text2);overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
-.bar{height:14px;background:var(--track)}.bar i{display:block;height:100%}
+.bar{height:14px;background:var(--track)}.bar i{display:block;height:100%;transform-origin:left;animation:grow .8s cubic-bezier(.2,.7,.2,1) backwards}
 .row .v{font-family:var(--mono);font-size:14px;color:var(--text);text-align:right}
 .row .v2{font-family:var(--mono);font-size:14px;color:var(--muted);text-align:right}
 .two{display:grid;grid-template-columns:repeat(auto-fit,minmax(300px,1fr));gap:40px 48px}
@@ -55,11 +58,13 @@ h2{margin:0;font-size:18px;font-weight:600}
 .heat .r{display:grid;grid-template-columns:36px minmax(0,1fr);gap:8px;align-items:center}
 .heat .d{font-family:var(--mono);font-size:11px;color:var(--muted)}
 .heat .cells{display:grid;grid-template-columns:repeat(24,minmax(0,1fr));gap:2px}
-.heat .cells i{display:block;height:14px}
+.heat .cells i{display:block;height:14px;transition:box-shadow .15s ease}
+.heat .cells i:hover{box-shadow:0 0 0 1.5px var(--text)}
 .ticks{display:flex;justify-content:space-between;font-family:var(--mono);font-size:11px;color:var(--faint)}
 .note{font-size:14px;color:var(--text2)}
 .list{display:flex;flex-direction:column;border-top:1px solid var(--rule)}
-.list .li{display:grid;gap:16px;align-items:center;padding:14px 0;border-bottom:1px solid var(--rule)}
+.list .li{display:grid;gap:16px;align-items:center;padding:14px 0;border-bottom:1px solid var(--rule);transition:background .15s ease}
+a.li:hover{background:var(--track)}
 .foot{font-family:var(--mono);font-size:12px;line-height:1.6;color:var(--faint);border-top:1px solid var(--rule);padding-top:20px}
 .empty{font-size:20px;color:var(--text2)}
 .overlay{position:fixed;inset:0;background:rgba(10,10,9,.82);display:flex;align-items:center;justify-content:center;padding:24px;z-index:10}
@@ -73,6 +78,13 @@ h2{margin:0;font-size:18px;font-weight:600}
 .notice .row2{display:flex;justify-content:flex-end;gap:10px;margin-top:8px}
 .actions{display:flex;gap:10px;align-items:center;flex-wrap:wrap}
 .actions .status{font-family:var(--mono);font-size:12px;color:var(--muted);margin-left:auto}
+@keyframes pop{from{opacity:0;transform:scale(.3)}}
+@keyframes fade{from{opacity:0}}
+@keyframes rise{from{opacity:0;transform:translateY(10px)}}
+@keyframes grow{from{transform:scaleX(0)}}
+.intro>*{animation:rise .6s cubic-bezier(.2,.7,.2,1) backwards}
+.swap>:not(.hdr){animation:fade .3s ease backwards}
+@media (prefers-reduced-motion:reduce){*,*::before,*::after{animation:none!important;transition:none!important}}
 body.card{width:1200px;height:675px;overflow:hidden}
 body.card canvas{display:block;width:1200px;height:675px}
 </style>
@@ -241,7 +253,7 @@ function dayTip(count, date){
   return (count ? plural(count, 'prompt') : 'No prompts') + ' on ' + when + '.';
 }
 const tip = h('div', {class:'tip'});
-const hideTip = () => { tip.style.display = 'none'; };
+const hideTip = () => tip.classList.remove('on');
 window.addEventListener('scroll', hideTip, true);
 
 function yearGrid(key, cell, gap){
@@ -251,7 +263,8 @@ function yearGrid(key, cell, gap){
   for (const c of g.cells){
     box.append(h('div', {class:'c', 'data-tip': dayTip(c.count, c.date), style:
       `left:${c.col*pitch}px;top:${c.row*pitch}px;width:${cell}px;height:${cell}px;` +
-      `background:${c.level ? 'var(--accent)' : 'var(--cell)'};opacity:${c.level ? OPACITY[c.level] : 1}`}));
+      `background:${c.level ? 'var(--accent)' : 'var(--cell)'};--o:${c.level ? OPACITY[c.level] : 1};` +
+      `animation-delay:${c.col * 10 + c.row * 15}ms`}));
   }
   if (g.streak){
     box.append(h('div', {class:'streakbox', style:
@@ -263,9 +276,11 @@ function yearGrid(key, cell, gap){
     if (!text) return hideTip();
     const r = e.target.getBoundingClientRect();
     tip.textContent = text;
+    // Glide between cells, but appear in place rather than sliding in from the last one.
+    tip.style.transition = tip.classList.contains('on') ? '' : 'opacity .12s ease';
     tip.style.left = (r.left + r.width / 2) + 'px';
-    tip.style.top = (r.top - 6) + 'px';
-    tip.style.display = 'block';
+    tip.style.top = (r.top - 10) + 'px';
+    tip.classList.add('on');
   };
   box.onmouseleave = hideTip;
   const months = h('div', {class:'months', style:`width:${W}px`},
@@ -275,10 +290,29 @@ function yearGrid(key, cell, gap){
 
 // ---------------------------------------------------------------- page
 
-let range = 'all';
+let range = 'all', firstRender = true;
 
 function stat(n, l){ return h('div', {class:'stat'}, h('div', {class:'n'}, n), h('div', {class:'l'}, l)); }
-function bar(width, top){ return h('div', {class:'bar'}, h('i', {style:`width:${width}%;background:${top ? 'var(--accent)' : 'var(--bar2)'}`})); }
+function bar(width, top, i){
+  return h('div', {class:'bar'}, h('i', {style:`width:${width}%;background:${top ? 'var(--accent)' : 'var(--bar2)'};animation-delay:${200 + 50 * i}ms`}));
+}
+
+// Count the first number in an element's text up from zero, keeping its format ("101M", "+14.2k", "48-day streak").
+const MOTION = !window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+function countUp(el){
+  const text = el.textContent, m = text.match(/^(\D*?)(\d[\d,]*(?:\.\d+)?)(.*)$/s);
+  if (!MOTION || !m) return;
+  const target = parseFloat(m[2].replace(/,/g, '')), dec = (m[2].split('.')[1] || '').length, commas = m[2].includes(',');
+  const t0 = performance.now(), dur = 900;
+  const step = now => {
+    const t = Math.min(1, (now - t0) / dur), v = target * (1 - Math.pow(1 - t, 3));
+    if (t >= 1) { el.textContent = text; return; }
+    const n = commas ? Math.round(v).toLocaleString('en-US') : v.toFixed(dec);
+    el.textContent = m[1] + n + m[3];
+    requestAnimationFrame(step);
+  };
+  requestAnimationFrame(step);
+}
 
 function header(){
   const right = h('div', {style:'display:flex;gap:20px;align-items:center;flex-wrap:wrap'});
@@ -328,7 +362,7 @@ function render(){
       h('div', {class:'sechdr'}, h('h2', {}, 'Where the tokens went'), h('span', {}, within('by project · sessions', st))),
       h('div', {class:'rows'}, st.projects.slice(0, 8).map(([name, p], i) =>
         h('div', {class:'row', style:'grid-template-columns:180px minmax(0,1fr) 64px 64px'},
-          h('span', {class:'name', title: name}, name), bar(100 * p.tokens / max, i === 0),
+          h('span', {class:'name', title: name}, name), bar(100 * p.tokens / max, i === 0, i),
           h('span', {class:'v'}, compact(p.tokens)), h('span', {class:'v2'}, int(p.sessions)))))));
     app.append(h('div', {class:'two'}, modelsSection(st), heatSection(st)));
   } else {
@@ -337,6 +371,12 @@ function render(){
   const mcp = mcpSection(st); if (mcp) app.append(mcp);
   const prs = prSection(st); if (prs) app.append(prs);
   app.append(footer());
+
+  // Sections rise in one after another on load; a range switch just fades the new numbers in.
+  app.className = 'wrap ' + (firstRender ? 'intro' : 'swap');
+  if (firstRender) [...app.children].forEach((el, i) => { el.style.animationDelay = (i * 70) + 'ms'; });
+  firstRender = false;
+  app.querySelectorAll('.headline .big, .stat .n').forEach(countUp);
 }
 
 function modelsSection(st){
@@ -351,7 +391,7 @@ function modelsSection(st){
     h('div', {class:'sechdr'}, h('h2', {}, 'Models you ran'), h('span', {}, within('share of tokens', st))),
     h('div', {class:'rows', style:'gap:12px'}, rows.slice(0, 6).map(([m, [t]], i) =>
       h('div', {class:'row', style:'grid-template-columns:150px minmax(0,1fr) 48px'},
-        h('span', {class:'name', style:'font-size:13px', title: m}, modelName(m)), bar(100 * t / max, i === 0),
+        h('span', {class:'name', style:'font-size:13px', title: m}, modelName(m)), bar(100 * t / max, i === 0, i),
         h('span', {class:'v', style:'font-size:13px'}, pct(t, total) + '%')))),
     note && h('div', {class:'note'}, note));
 }
