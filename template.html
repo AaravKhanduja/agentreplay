@@ -22,6 +22,7 @@ button{font:inherit}
 .ranges button.on{background:var(--text);color:var(--ground)}
 .btn{font-family:var(--mono);font-size:13px;border:1px solid var(--line);background:transparent;padding:8px 14px;color:var(--text);min-height:28px;display:inline-flex;align-items:center;cursor:pointer}
 .btn:hover{border-color:var(--muted)}
+.btn:focus-visible,.ranges button:focus-visible{outline:1px solid var(--muted);outline-offset:2px}
 .months{position:relative;height:16px;font-family:var(--mono);font-size:12px;color:var(--muted)}
 .months span{position:absolute;top:0}
 .grid{position:relative;max-width:100%;overflow-x:auto;padding:5px;margin:-5px}
@@ -63,6 +64,12 @@ h2{margin:0;font-size:18px;font-weight:600}
 .overlay{position:fixed;inset:0;background:rgba(10,10,9,.82);display:flex;align-items:center;justify-content:center;padding:24px;z-index:10}
 .panel{background:var(--ground);border:1px solid var(--line);padding:20px;display:flex;flex-direction:column;gap:16px;max-width:100%}
 .panel canvas{display:block;width:960px;max-width:calc(100vw - 90px);height:auto;border:1px solid var(--rule)}
+.notice{position:fixed;inset:0;display:flex;align-items:center;justify-content:center;padding:24px;z-index:11;background:rgba(10,10,9,.6)}
+.notice .box{background:var(--ground);border:1px solid var(--line);padding:24px 28px;width:420px;max-width:100%;display:flex;flex-direction:column;gap:12px}
+.notice .title{display:flex;align-items:center;gap:12px;font-family:var(--mono);font-size:15px;color:var(--text)}
+.notice .body{font-size:14px;line-height:1.5;color:var(--text2)}
+.notice kbd{font-family:var(--mono);font-size:13px;color:var(--text);border:1px solid var(--line);border-radius:4px;padding:1px 6px}
+.notice .row2{display:flex;justify-content:flex-end;gap:10px;margin-top:8px}
 .actions{display:flex;gap:10px;align-items:center;flex-wrap:wrap}
 .actions .status{font-family:var(--mono);font-size:12px;color:var(--muted);margin-left:auto}
 body.card{width:1200px;height:675px;overflow:hidden}
@@ -161,10 +168,17 @@ function stats(key){
   };
 }
 
-function headline(){
-  const s = D.streak.longest;
-  if (s && s.days > 7) return {big: s.days + '-day streak', dates: fmtDay(s.start) + ' to ' + fmtDay(s.end)};
-  return {big: plural(D.allSessions.length, 'session'), dates: D.firstDay ? 'since ' + fmtDay(D.firstDay) : ''};
+// The streak when it is worth leading with: more than a week, or for the
+// 7-day range, two days or more. Otherwise the range's session count.
+function headline(st){
+  const s = D.streaks[st.key].longest;
+  if (s && s.days > (st.key === 'd7' ? 1 : 7)){
+    return {big: s.days + '-day streak', dates: s.days > 1 ? fmtDay(s.start) + ' to ' + fmtDay(s.end) : fmtDay(s.start)};
+  }
+  const dates = st.key === 'all' || st.key === 'year'
+    ? (st.first ? 'since ' + fmtDay(D.firstDay) : '')
+    : 'in the last ' + st.key.slice(1) + ' days';
+  return {big: plural(st.sessions, 'session'), dates};
 }
 
 // "since Sep 1" appended to a label when the detail covers only part of the range.
@@ -190,32 +204,34 @@ function sentence(st){
 
 // ---------------------------------------------------------------- year grid
 
-function gridModel(){
-  const start = day(D.grid.start);
-  const cells = D.grid.levels.map((level, i) => {
+function gridModel(key){
+  const grid = D.grids[key], start = day(grid.start);
+  // Level -1 pads the first week out to Monday; those days aren't drawn.
+  const cells = grid.levels.map((level, i) => {
     const d = new Date(start.getTime() + i * DAY);
-    return {i, col: Math.floor(i / 7), row: i % 7, level, count: D.grid.counts[i], date: d};
-  });
+    return {i, col: Math.floor(i / 7), row: i % 7, level, count: grid.counts[i], date: d};
+  }).filter(c => c.level >= 0);
+  const cols = Math.ceil(grid.levels.length / 7);
   const months = []; let last = -1;
-  cells.forEach(c => {
+  cells.forEach((c, n) => {
     if (c.date.getMonth() !== last){
       last = c.date.getMonth();
-      if (c.i > 0 && c.i < 5) return;  // first month has too few days to label
+      if (n > 0 && n < 5) return;  // first month has too few days to label
       months.push({col: c.col, name: MONTHS[last]});
     }
   });
   let streak = null;
-  const s = D.streak.longest;
-  if (s){
+  const s = D.streaks[key].longest;
+  if (s && s.days > 1){  // a one-day streak isn't worth an outline
     const col = iso => Math.floor(Math.round((day(iso) - start) / DAY) / 7);
     streak = {c0: Math.max(col(s.start), 0), c1: col(s.end)};
   }
-  return {cells, months, streak};
+  return {cells, months, streak, cols};
 }
 
-function yearGrid(cell, gap){
-  const pitch = cell + gap, g = gridModel();
-  const W = 53 * pitch - gap, H = 7 * pitch - gap;
+function yearGrid(key, cell, gap){
+  const pitch = cell + gap, g = gridModel(key);
+  const W = g.cols * pitch - gap, H = 7 * pitch - gap;
   const box = h('div', {class:'cells', style:`width:${W}px;height:${H}px`});
   for (const c of g.cells){
     const label = `${fmtDay(c.date.getFullYear() + '-' + (c.date.getMonth()+1) + '-' + c.date.getDate())}: ${plural(c.count, 'prompt')}`;
@@ -223,7 +239,7 @@ function yearGrid(cell, gap){
       `left:${c.col*pitch}px;top:${c.row*pitch}px;width:${cell}px;height:${cell}px;` +
       `background:${c.level ? 'var(--accent)' : 'var(--cell)'};opacity:${c.level ? OPACITY[c.level] : 1}`}));
   }
-  if (g.streak && D.streak.longest.days > 1){
+  if (g.streak){
     box.append(h('div', {class:'streakbox', style:
       `left:${g.streak.c0*pitch-4}px;top:-4px;width:${(g.streak.c1-g.streak.c0+1)*pitch-gap+8}px;height:${H+8}px`}));
   }
@@ -262,8 +278,8 @@ function render(){
     return;
   }
   const st = stats(range);
-  const hl = headline();
-  app.append(yearGrid(17, 2));
+  const hl = headline(st);
+  app.append(yearGrid(range, 17, 2));
   app.append(h('div', {style:'margin-top:-16px'},
     h('div', {class:'headline'}, h('div', {class:'big'}, hl.big), h('div', {class:'dates'}, hl.dates)),
     h('div', {class:'sentence'}, sentence(st).map(([t, hi]) => hi ? h('b', {}, t) : t))));
@@ -409,7 +425,7 @@ function drawCard(canvas){
   ctx.textAlign = 'left';
 
   // Month labels and the year grid.
-  const CELL = 19, GAP = 2, P = CELL + GAP, top = 132, g = gridModel();
+  const CELL = 19, GAP = 2, P = CELL + GAP, top = 132, g = gridModel('year');
   ctx.font = `400 12px ${MONO}`; ctx.fillStyle = C.muted;
   for (const m of g.months) ctx.fillText(m.name, L + m.col * P, top - 10);
   for (const c of g.cells){
@@ -418,14 +434,14 @@ function drawCard(canvas){
     roundRect(ctx, L + c.col * P, top + c.row * P, CELL, CELL, 2); ctx.fill();
   }
   ctx.globalAlpha = 1;
-  if (g.streak && D.streak.longest.days > 1){
+  if (g.streak){
     ctx.strokeStyle = C.accent; ctx.lineWidth = 1.5;
     roundRect(ctx, L + g.streak.c0 * P - 4.25, top - 4.25, (g.streak.c1 - g.streak.c0 + 1) * P - GAP + 8.5, 7 * P - GAP + 8.5, 5);
     ctx.stroke();
   }
 
   // Headline and sentence.
-  const st = stats('year'), hl = headline();
+  const st = stats('year'), hl = headline(st);
   ctx.font = `500 72px ${MONO}`; ctx.fillStyle = C.accent;
   if (ctx.letterSpacing !== undefined) ctx.letterSpacing = '-2px';
   ctx.fillText(hl.big, L, 418);
@@ -458,7 +474,7 @@ function roundRect(ctx, x, y, w, h, r){
 }
 
 function shareText(){
-  const st = stats('year'), hl = headline();
+  const st = stats('year'), hl = headline(st);
   return `${hl.big} with Claude Code: ${plural(st.sessions, 'session')} across ${plural(st.projectCount, 'project')}.\n\n` +
          `See yours, fully local: ${REPO}`;
 }
@@ -469,7 +485,11 @@ async function openExport(){
   drawCard(canvas);
   const status = h('span', {class:'status'});
   const close = () => { overlay.remove(); document.removeEventListener('keydown', onKey); };
-  const onKey = e => { if (e.key === 'Escape') close(); };
+  const onKey = e => {
+    if (e.key !== 'Escape') return;
+    const open = document.querySelector('.notice');
+    if (open) open.remove(); else close();
+  };
   const download = () => canvas.toBlob(blob => {
     const a = h('a', {href: URL.createObjectURL(blob), download: 'agentreplay-card.png'});
     a.click(); setTimeout(() => URL.revokeObjectURL(a.href), 1000);
@@ -490,18 +510,41 @@ async function openExport(){
     else { download(); status.textContent = 'Copying is blocked here, so the PNG was downloaded instead.'; }
   };
   // An X intent link can only carry text, so the card rides on the clipboard:
-  // copy it, open the composer, and the image is one paste away.
+  // copy it, open the composer in a popup beside this page, and say how to
+  // paste it. Both the copy and the popup start inside the click.
   const post = async () => {
     const copied = copyCard();
-    window.open('https://x.com/intent/post?text=' + encodeURIComponent(shareText()), '_blank', 'noopener');
-    if (await copied) status.textContent = `Card copied. Press ${paste} in the post to attach it.`;
-    else { download(); status.textContent = 'Card downloaded. Drag agentreplay-card.png into the post.'; }
+    const url = 'https://x.com/intent/post?text=' + encodeURIComponent(shareText());
+    const w = 600, ht = 680;
+    const left = Math.max(0, window.screenX + window.outerWidth - w - 40), top = Math.max(0, window.screenY + 80);
+    const popup = window.open(url, 'agentreplay-post', `popup,width=${w},height=${ht},left=${left},top=${top}`);
+    if (popup) popup.opener = null;
+    const ok = await copied;
+    if (!ok) download();
+    notice(ok ? 'Image copied to clipboard' : 'Card downloaded',
+      ok ? ['Press ', h('kbd', {}, paste), ' in your post to add the card.']
+         : ['Your browser blocked copying, so agentreplay-card.png was downloaded. Drag it into your post.'],
+      popup ? null : url);
+  };
+  // The message that walks you from this page to the post. If the popup was
+  // blocked, it carries the link instead.
+  const notice = (title, body, link) => {
+    const done = () => box.remove();
+    const box = h('div', {class:'notice', onclick: e => { if (e.target === box) done(); }},
+      h('div', {class:'box'},
+        h('div', {class:'title'}, h('span', {class:'mark'}), title),
+        h('div', {class:'body'}, body),
+        h('div', {class:'row2'},
+          link && h('a', {class:'btn', href: link, target:'_blank', rel:'noopener', onclick: done}, 'Open X'),
+          h('button', {class:'btn', onclick: done}, link ? 'Close' : 'Done'))));
+    document.body.append(box);
+    box.querySelector('button').focus();
   };
   const overlay = h('div', {class:'overlay', onclick: e => { if (e.target === overlay) close(); }},
     h('div', {class:'panel'}, canvas,
       h('div', {class:'actions'},
         h('button', {class:'btn', onclick: copy}, 'Copy image'),
-        h('button', {class:'btn', onclick: post}, 'Copy & post on X'),
+        h('button', {class:'btn', onclick: post}, 'Post on X'),
         h('button', {class:'btn', onclick: download}, 'Download PNG'),
         status,
         h('button', {class:'btn', onclick: close}, 'Close'))));

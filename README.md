@@ -27,7 +27,7 @@ That writes `agentreplay.html` and `agentreplay-card.html` to the current direct
 
 ## Sharing the card
 
-On the overview, **Export card** shows the card. **Copy & post on X** copies the card to your clipboard and opens an X post with your headline stat filled in; press ⌘V (Ctrl+V) in the post to attach the card. X's post link can only carry text, and uploading the image for you would mean sending it somewhere, so the card travels by clipboard. **Copy image** and **Download PNG** are there if you're posting somewhere else. `agentreplay-card.html` is the same card as a page.
+On the overview, **Export card** shows the card. **Post on X** copies the card to your clipboard and opens X's composer in a popup with your headline stat filled in; the page tells you to press ⌘V (Ctrl+V) in the post to attach the card. X's post link can only carry text, and uploading the image for you would mean sending it somewhere, so the card travels by clipboard. **Copy image** and **Download PNG** are there if you're posting somewhere else. `agentreplay-card.html` is the same card as a page.
 
 ## What the numbers mean
 
@@ -49,7 +49,7 @@ If you'd like the detail to reach further back next year, raise `cleanupPeriodDa
 - **When you work**: the same prompts, by weekday and hour.
 - **MCP error rate**: failed calls over calls that ran. Calls you declined aren't failures.
 
-The time-range switch (All time, 90d, 30d, 7d) filters everything except the year grid, by when each session started.
+The time-range switch (All time, 90d, 30d, 7d) filters everything, including the grid and the streak; within a range, the grid's shades are relative to that range's own busiest days. The share card always shows the last 12 months.
 
 ## Privacy
 

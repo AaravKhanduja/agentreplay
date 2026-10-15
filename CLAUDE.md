@@ -49,7 +49,7 @@ python3 agentreplay.py --json                                 # real stats as JS
   - Cyan `#7cc4d6` is only for failure numbers (the MCP error rate).
 - IBM Plex Mono for numbers and labels, Plex Sans for sentences. Second-person voice.
 - No gradients, icons, emoji, or lowercase-everything.
-- The year grid is always the last 12 months, using quantile opacity levels, with the longest streak outlined. The range switch never changes it.
+- The grid and streak follow the range switch (`grids`/`streaks` per range in the payload). Shades are quantile levels within that range, and the longest streak is outlined. All time reaches back at least 12 months; the card always uses `year`.
 
 ## Out of scope for v1
 

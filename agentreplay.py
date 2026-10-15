@@ -376,6 +376,7 @@ def analyze(claude_dir, tz, now=None):
     for (day, _hour), n in history["buckets"].items():
         prompt_days[date.fromisoformat(day)] += n
 
+    starts = range_starts(prompt_days, today)
     prs.sort(key=lambda p: p["ts"], reverse=True)
     origin = int(datetime.combine(today, time(), tz).timestamp() * 1000)
     detail_since = since.isoformat() if since else None
@@ -409,8 +410,9 @@ def analyze(claude_dir, tz, now=None):
         "allSessions": sorted([start, index[path]] for start, path in every.values()),
         # [local date, hour, prompts you typed].
         "prompts": [[d, h, n] for (d, h), n in sorted(history["buckets"].items())],
-        "grid": year_grid(prompt_days, today),
-        "streak": streaks(prompt_days, today),
+        # The grid and streak for each range, plus `year` for the card.
+        "grids": {k: year_grid(prompt_days, today, d) for k, d in starts.items()},
+        "streaks": {k: streaks(prompt_days, today, d) for k, d in starts.items()},
         # Per-transcript detail rows.
         "sessions": [strip_row(r) for r in rows],
         # [start ms, end ms] of Claude's working time, disjoint and sorted.
@@ -550,16 +552,29 @@ def union(spans):
     return merged
 
 
-def year_grid(days, today):
-    """53 weeks x 7 days ending today, Monday first, with quantile levels 0-5
-    of the day's count (prompts you typed)."""
-    first = today - timedelta(days=GRID_DAYS - 1)
+def range_starts(days, today):
+    """First day of each range. All time reaches back at least 12 months so
+    the grid keeps its shape; `year` is the share card's last 12 months."""
+    year = today - timedelta(days=GRID_DAYS - 1)
+    starts = {"all": min([year] + list(days)), "year": year}
+    for key, n in RANGES.items():
+        if n is not None:
+            starts[key] = today - timedelta(days=n - 1)
+    return starts
+
+
+def year_grid(days, today, first):
+    """Weeks from `first` to today, Monday first, with quantile levels 1-5 of
+    each day's count (prompts you typed) within the range. 0 is a quiet day,
+    -1 a day before the range that only fills out its first week."""
     start = first - timedelta(days=first.weekday())
     count = (today - start).days + 1
     values = [days.get(start + timedelta(days=i), 0) for i in range(count)]
-    active = sorted(v for v in values if v > 0)
+    lead = (first - start).days
+    active = sorted(v for v in values[lead:] if v > 0)
     cuts = [active[int(q * (len(active) - 1))] for q in (0.2, 0.4, 0.6, 0.8)] if active else []
-    levels = [0 if v <= 0 else 1 + sum(v > c for c in cuts) for v in values]
+    levels = [-1 if i < lead else 0 if v <= 0 else 1 + sum(v > c for c in cuts)
+              for i, v in enumerate(values)]
     return {
         "start": start.isoformat(),
         "levels": levels,
@@ -567,9 +582,8 @@ def year_grid(days, today):
     }
 
 
-def streaks(days, today):
-    """Longest run of active days in the last 12 months, and the current run."""
-    first = today - timedelta(days=GRID_DAYS - 1)
+def streaks(days, today, first):
+    """Longest run of active days between `first` and today, and the current run."""
     active = sorted(d for d, m in days.items() if m > 0 and first <= d <= today)
     best, run_start, prev = None, None, None
     for d in active:

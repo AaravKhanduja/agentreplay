@@ -94,9 +94,12 @@ class FixtureTest(unittest.TestCase):
 
     def test_streak_from_history(self):
         self.assertEqual(
-            self.payload["streak"],
+            self.payload["streaks"]["all"],
             {"longest": {"start": "2026-06-01", "end": "2026-06-02", "days": 2}, "current": 0},
         )
+        # The June streak is outside the last 30 days; Oct 10 is inside.
+        self.assertEqual(self.payload["streaks"]["d30"]["longest"]["start"], "2026-10-10")
+        self.assertEqual(self.payload["streaks"]["d7"]["longest"]["days"], 1)
 
 
 class NoHistoryTest(unittest.TestCase):
@@ -128,15 +131,22 @@ class UnitTest(unittest.TestCase):
 
     def test_streaks(self):
         days = {date(2026, 10, d): 5 for d in (1, 2, 3, 5, 6, 14, 15)}
-        s = ar.streaks(days, date(2026, 10, 15))
+        s = ar.streaks(days, date(2026, 10, 15), date(2025, 10, 16))
         self.assertEqual(s["longest"], {"start": "2026-10-01", "end": "2026-10-03", "days": 3})
         self.assertEqual(s["current"], 2)
 
     def test_year_grid_starts_on_monday(self):
-        grid = ar.year_grid({date(2026, 10, 15): 30}, date(2026, 10, 15))
+        grid = ar.year_grid({date(2026, 10, 15): 30}, date(2026, 10, 15), date(2025, 10, 16))
         self.assertEqual(date.fromisoformat(grid["start"]).weekday(), 0)
         self.assertEqual(grid["levels"][-1], 1)
         self.assertLessEqual(len(grid["levels"]), 53 * 7)
+
+    def test_short_range_grid_marks_days_before_it(self):
+        # Oct 15 2026 is a Thursday; a 7-day range starts Fri Oct 9, so the
+        # grid starts Mon Oct 5 and its first four days are outside the range.
+        grid = ar.year_grid({date(2026, 10, 9): 3, date(2026, 10, 6): 9}, date(2026, 10, 15), date(2026, 10, 9))
+        self.assertEqual(grid["start"], "2026-10-05")
+        self.assertEqual(grid["levels"][:5], [-1, -1, -1, -1, 1])
 
     def test_pr_title_forms(self):
         self.assertEqual(ar.pr_title('gh pr create --title "Fix \\"x\\"" --body y'), 'Fix "x"')
@@ -147,7 +157,7 @@ class UnitTest(unittest.TestCase):
         with tempfile.TemporaryDirectory() as tmp:
             payload = ar.analyze(Path(tmp), timezone.utc, now=NOW)
         self.assertEqual(payload["sessions"], [])
-        self.assertEqual(payload["streak"], {"longest": None, "current": 0})
+        self.assertEqual(payload["streaks"]["all"], {"longest": None, "current": 0})
 
 
 class RenderTest(unittest.TestCase):
