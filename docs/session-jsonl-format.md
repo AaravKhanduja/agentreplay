@@ -1,7 +1,7 @@
 # Claude Code session JSONL format
 
-> Claude Code's format. Codex CLI rollouts are described in
-> [codex-rollout-format.md](codex-rollout-format.md).
+> Claude Code's format. (The Codex CLI rollout format is documented on the
+> `v2-codex-parsers` branch.)
 
 What AgentReplay actually parses. Verified against Claude Code v2.1.x session
 files (`~/.claude/projects/<encoded-project-dir>/<session-uuid>.jsonl`). The
@@ -95,22 +95,27 @@ assistant turn.
 plan-mode signal), `file-history-snapshot`, `ai-title`, `attachment`,
 `last-prompt`, `queued-prompt`, and any unknown `type`.
 
-## Parsing rules (normative for @agentreplay/core)
+## Parsing rules (normative for agentreplay.py)
 
-1. A line that fails `JSON.parse` or has no usable shape → count as skipped,
-   continue. Unknown-but-valid line types are skipped WITHOUT counting.
-2. Skip `isSidechain: true` lines entirely (subagent chatter).
-3. User turn = `user` line with string content or text blocks and no
-   `tool_result` blocks.
-4. Consecutive `assistant` lines merge into one `Turn` until a user turn
-   appears; `tool_use` blocks become `ToolCall`s on that turn.
-5. Match `tool_use` → `tool_result` by id; orphaned calls get
-   `outcome: 'unknown'`. `durationMs` = result timestamp − call timestamp.
-6. Error detection: `is_error: true` on the tool_result block; for Bash also
-   scan result text for `/error|failed|exception|traceback|panic/i`.
-7. Plan mode: a turn is `planMode: true` if the most recent
-   `permission-mode` line (or `permissionMode` field) said `plan`.
-8. `model` = first assistant `message.model`; `totalTokens` = sum of
-   `usage.output_tokens` + `usage.input_tokens` counted once per `message.id`.
-9. File paths: take `file_path` / `path` / `notebook_path` from tool input,
-   normalize relative to the project path (from `cwd`).
+1. Read `projects/<dir>/<session>.jsonl` and every
+   `projects/<dir>/<session>/subagents/*.jsonl`; subagent files belong to the
+   session named by their directory.
+2. A line that fails `json.loads` or isn't an object is counted as skipped.
+   Unknown-but-valid types are ignored without counting. Nothing crashes.
+3. Resumes and forks copy earlier records, timestamps and ids intact, into the
+   new file (rewriting `sessionId`). Dedupe records by `uuid` and assistant
+   messages by `message.id` across all files; the session whose file was
+   created first owns the copies.
+4. Tokens = `input_tokens + output_tokens + cache_creation_input_tokens +
+   cache_read_input_tokens`, once per `message.id`. Skip model `<synthetic>`.
+5. A human prompt is a `user` line with no `tool_result` blocks, not
+   `isMeta`, not `isSidechain`, not `isCompactSummary`, whose `origin.kind`
+   (when present) is `human`, and whose text isn't a `<command-name>`,
+   `<local-command…>`, `<task-notification>` or `[Request interrupted` line.
+6. Match `tool_use` to `tool_result` by id. A result matching the decline
+   pattern (`user doesn't want to proceed`, `tool use was rejected`, …) is
+   declined, never an error; otherwise `is_error: true` is an error.
+7. Lines written/removed come from `toolUseResult.structuredPatch` hunk lines
+   (`+`/`-`); `toolUseResult.type == "create"` counts its `content`. Only when
+   neither is present, count newlines in the tool input. Paths under `.claude/`
+   are excluded.
